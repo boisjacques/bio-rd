@@ -5,25 +5,26 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/bio-routing/bio-rd/net"
 	bnet "github.com/bio-routing/bio-rd/net"
 )
 
 func TestNewRoute(t *testing.T) {
 	tests := []struct {
 		name     string
-		pfx      bnet.Prefix
+		pfx      *bnet.Prefix
 		path     *Path
 		expected *Route
 	}{
 		{
 			name: "BGP Path",
-			pfx:  bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+			pfx:  bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 			path: &Path{
 				Type:    BGPPathType,
 				BGPPath: &BGPPath{},
 			},
 			expected: &Route{
-				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 				paths: []*Path{
 					{
 						Type:    BGPPathType,
@@ -34,9 +35,9 @@ func TestNewRoute(t *testing.T) {
 		},
 		{
 			name: "Empty Path",
-			pfx:  bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+			pfx:  bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 			expected: &Route{
-				pfx:   bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+				pfx:   bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 				paths: []*Path{},
 			},
 		},
@@ -52,14 +53,14 @@ func TestPrefix(t *testing.T) {
 	tests := []struct {
 		name     string
 		route    *Route
-		expected bnet.Prefix
+		expected *bnet.Prefix
 	}{
 		{
 			name: "Prefix",
 			route: &Route{
-				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 			},
-			expected: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+			expected: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 		},
 	}
 
@@ -73,14 +74,14 @@ func TestAddr(t *testing.T) {
 	tests := []struct {
 		name     string
 		route    *Route
-		expected bnet.IP
+		expected *bnet.IP
 	}{
 		{
 			name: "Prefix",
 			route: &Route{
-				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 			},
-			expected: bnet.IPv4(0xa000000),
+			expected: bnet.IPv4(0xa000000).Ptr(),
 		},
 	}
 
@@ -99,7 +100,7 @@ func TestPfxlen(t *testing.T) {
 		{
 			name: "Prefix",
 			route: &Route{
-				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 			},
 			expected: 8,
 		},
@@ -120,7 +121,7 @@ func TestAddPath(t *testing.T) {
 	}{
 		{
 			name: "Regular BGP path",
-			route: NewRoute(bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8), &Path{
+			route: NewRoute(bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &Path{
 				Type:    BGPPathType,
 				BGPPath: &BGPPath{},
 			}),
@@ -129,7 +130,7 @@ func TestAddPath(t *testing.T) {
 				BGPPath: &BGPPath{},
 			},
 			expected: &Route{
-				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 				paths: []*Path{
 					{
 						Type:    BGPPathType,
@@ -144,13 +145,13 @@ func TestAddPath(t *testing.T) {
 		},
 		{
 			name: "Nil path",
-			route: NewRoute(bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8), &Path{
+			route: NewRoute(bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &Path{
 				Type:    BGPPathType,
 				BGPPath: &BGPPath{},
 			}),
 			newPath: nil,
 			expected: &Route{
-				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+				pfx: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 				paths: []*Path{
 					{
 						Type:    BGPPathType,
@@ -180,39 +181,63 @@ func TestRouteRemovePath(t *testing.T) {
 				{
 					Type: BGPPathType,
 					BGPPath: &BGPPath{
-						LocalPref: 100,
+						BGPPathA: &BGPPathA{
+							LocalPref: 100,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 					},
 				},
 				{
 					Type: BGPPathType,
 					BGPPath: &BGPPath{
-						LocalPref: 200,
+						BGPPathA: &BGPPathA{
+							LocalPref: 200,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 					},
 				},
 				{
 					Type: BGPPathType,
 					BGPPath: &BGPPath{
-						LocalPref: 300,
+						BGPPathA: &BGPPathA{
+							LocalPref: 300,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 					},
 				},
 			},
 			remove: &Path{
 				Type: BGPPathType,
 				BGPPath: &BGPPath{
-					LocalPref: 200,
+					BGPPathA: &BGPPathA{
+						LocalPref: 200,
+						Source:    net.IPv4(0).Ptr(),
+						NextHop:   net.IPv4(0).Ptr(),
+					},
 				},
 			},
 			expected: []*Path{
 				{
 					Type: BGPPathType,
 					BGPPath: &BGPPath{
-						LocalPref: 100,
+						BGPPathA: &BGPPathA{
+							LocalPref: 100,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 					},
 				},
 				{
 					Type: BGPPathType,
 					BGPPath: &BGPPath{
-						LocalPref: 300,
+						BGPPathA: &BGPPathA{
+							LocalPref: 300,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 					},
 				},
 			},
@@ -223,33 +248,53 @@ func TestRouteRemovePath(t *testing.T) {
 				{
 					Type: BGPPathType,
 					BGPPath: &BGPPath{
-						LocalPref: 10,
+						BGPPathA: &BGPPathA{
+							LocalPref: 10,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 					},
 				},
 				{
 					Type: BGPPathType,
 					BGPPath: &BGPPath{
-						LocalPref: 20,
+						BGPPathA: &BGPPathA{
+							LocalPref: 20,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 					},
 				},
 			},
 			remove: &Path{
 				Type: BGPPathType,
 				BGPPath: &BGPPath{
-					LocalPref: 50,
+					BGPPathA: &BGPPathA{
+						LocalPref: 50,
+						Source:    net.IPv4(0).Ptr(),
+						NextHop:   net.IPv4(0).Ptr(),
+					},
 				},
 			},
 			expected: []*Path{
 				{
 					Type: BGPPathType,
 					BGPPath: &BGPPath{
-						LocalPref: 10,
+						BGPPathA: &BGPPathA{
+							LocalPref: 10,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 					},
 				},
 				{
 					Type: BGPPathType,
 					BGPPath: &BGPPath{
-						LocalPref: 20,
+						BGPPathA: &BGPPathA{
+							LocalPref: 20,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 					},
 				},
 			},
@@ -271,7 +316,7 @@ func TestCopy(t *testing.T) {
 		{
 			name: "",
 			route: &Route{
-				pfx:       bnet.NewPfx(bnet.IPv4(1000), 8),
+				pfx:       bnet.NewPfx(bnet.IPv4(1000), 8).Ptr(),
 				ecmpPaths: 2,
 				paths: []*Path{
 					{
@@ -280,7 +325,7 @@ func TestCopy(t *testing.T) {
 				},
 			},
 			expected: &Route{
-				pfx:       bnet.NewPfx(bnet.IPv4(1000), 8),
+				pfx:       bnet.NewPfx(bnet.IPv4(1000), 8).Ptr(),
 				ecmpPaths: 2,
 				paths: []*Path{
 					{
@@ -328,7 +373,7 @@ func TestBestPath(t *testing.T) {
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4(32),
+							NextHop: bnet.IPv4(32).Ptr(),
 						},
 					},
 				},
@@ -336,7 +381,7 @@ func TestBestPath(t *testing.T) {
 			expected: &Path{
 				Type: StaticPathType,
 				StaticPath: &StaticPath{
-					NextHop: bnet.IPv4(32),
+					NextHop: bnet.IPv4(32).Ptr(),
 				},
 			},
 		},
@@ -366,13 +411,13 @@ func TestECMPPaths(t *testing.T) {
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4(32),
+							NextHop: bnet.IPv4(32).Ptr(),
 						},
 					},
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4(32),
+							NextHop: bnet.IPv4(32).Ptr(),
 						},
 					},
 				},
@@ -381,13 +426,13 @@ func TestECMPPaths(t *testing.T) {
 				{
 					Type: StaticPathType,
 					StaticPath: &StaticPath{
-						NextHop: bnet.IPv4(32),
+						NextHop: bnet.IPv4(32).Ptr(),
 					},
 				},
 				{
 					Type: StaticPathType,
 					StaticPath: &StaticPath{
-						NextHop: bnet.IPv4(32),
+						NextHop: bnet.IPv4(32).Ptr(),
 					},
 				},
 			},
@@ -398,7 +443,7 @@ func TestECMPPaths(t *testing.T) {
 	}
 }
 
-func TestCompare(t *testing.T) {
+func TestRouteEqual(t *testing.T) {
 	tests := []struct {
 		a     *Route
 		b     *Route
@@ -406,35 +451,37 @@ func TestCompare(t *testing.T) {
 	}{
 		{
 			a: &Route{
+				pfx:       net.NewPfx(net.IPv4(0), 0).Ptr(),
 				ecmpPaths: 2,
 				paths: []*Path{
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 0, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 0, 1).Ptr(),
 						},
 					},
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1).Ptr(),
 						},
 					},
 				},
 			},
 			b: &Route{
+				pfx:       net.NewPfx(net.IPv4(0), 0).Ptr(),
 				ecmpPaths: 2,
 				paths: []*Path{
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 0, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 0, 1).Ptr(),
 						},
 					},
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1).Ptr(),
 						},
 					},
 				},
@@ -442,35 +489,37 @@ func TestCompare(t *testing.T) {
 			equal: true,
 		}, {
 			a: &Route{
+				pfx:       net.NewPfx(net.IPv4(0), 0).Ptr(),
 				ecmpPaths: 2,
 				paths: []*Path{
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 0, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 0, 1).Ptr(),
 						},
 					},
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1).Ptr(),
 						},
 					},
 				},
 			},
 			b: &Route{
+				pfx:       net.NewPfx(net.IPv4(0), 0).Ptr(),
 				ecmpPaths: 2,
 				paths: []*Path{
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1).Ptr(),
 						},
 					},
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 2, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 2, 1).Ptr(),
 						},
 					},
 				},
@@ -479,29 +528,31 @@ func TestCompare(t *testing.T) {
 		},
 		{
 			a: &Route{
+				pfx:       net.NewPfx(net.IPv4(0), 0).Ptr(),
 				ecmpPaths: 2,
 				paths: []*Path{
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 0, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 0, 1).Ptr(),
 						},
 					},
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1).Ptr(),
 						},
 					},
 				},
 			},
 			b: &Route{
+				pfx:       net.NewPfx(net.IPv4(0), 0).Ptr(),
 				ecmpPaths: 2,
 				paths: []*Path{
 					{
 						Type: StaticPathType,
 						StaticPath: &StaticPath{
-							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1),
+							NextHop: bnet.IPv4FromOctets(192, 168, 1, 1).Ptr(),
 						},
 					},
 				},

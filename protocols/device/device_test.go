@@ -17,14 +17,14 @@ func TestDeviceCopy(t *testing.T) {
 			name: "Test #1",
 			dev: &Device{
 				Name: "Foo",
-				Addrs: []bnet.Prefix{
-					bnet.NewPfx(bnet.IPv4(100), 8),
+				Addrs: []*bnet.Prefix{
+					bnet.NewPfx(bnet.IPv4(100), 8).Ptr(),
 				},
 			},
 			expected: &Device{
 				Name: "Foo",
-				Addrs: []bnet.Prefix{
-					bnet.NewPfx(bnet.IPv4(100), 8),
+				Addrs: []*bnet.Prefix{
+					bnet.NewPfx(bnet.IPv4(100), 8).Ptr(),
 				},
 			},
 		},
@@ -32,7 +32,7 @@ func TestDeviceCopy(t *testing.T) {
 
 	for _, test := range tests {
 		copy := test.dev.copy()
-		test.dev.addAddr(bnet.NewPfx(bnet.IPv4(200), 8))
+		test.dev.addAddr(bnet.NewPfx(bnet.IPv4(200), 8).Ptr())
 		assert.Equalf(t, test.expected, copy, "Test %q", test.name)
 	}
 }
@@ -41,40 +41,40 @@ func TestDeviceDelAddr(t *testing.T) {
 	tests := []struct {
 		name     string
 		dev      *Device
-		delete   bnet.Prefix
+		delete   *bnet.Prefix
 		expected *Device
 	}{
 		{
 			name: "Test #1",
 			dev: &Device{
-				Addrs: []bnet.Prefix{
-					bnet.NewPfx(bnet.IPv4(100), 8),
-					bnet.NewPfx(bnet.IPv4(200), 8),
-					bnet.NewPfx(bnet.IPv4(300), 8),
+				Addrs: []*bnet.Prefix{
+					bnet.NewPfx(bnet.IPv4(100), 8).Ptr(),
+					bnet.NewPfx(bnet.IPv4(200), 8).Ptr(),
+					bnet.NewPfx(bnet.IPv4(300), 8).Ptr(),
 				},
 			},
-			delete: bnet.NewPfx(bnet.IPv4(200), 8),
+			delete: bnet.NewPfx(bnet.IPv4(200), 8).Ptr(),
 			expected: &Device{
-				Addrs: []bnet.Prefix{
-					bnet.NewPfx(bnet.IPv4(100), 8),
-					bnet.NewPfx(bnet.IPv4(300), 8),
+				Addrs: []*bnet.Prefix{
+					bnet.NewPfx(bnet.IPv4(100), 8).Ptr(),
+					bnet.NewPfx(bnet.IPv4(300), 8).Ptr(),
 				},
 			},
 		},
 		{
 			name: "Test #2",
 			dev: &Device{
-				Addrs: []bnet.Prefix{
-					bnet.NewPfx(bnet.IPv4(100), 8),
-					bnet.NewPfx(bnet.IPv4(200), 8),
-					bnet.NewPfx(bnet.IPv4(300), 8),
+				Addrs: []*bnet.Prefix{
+					bnet.NewPfx(bnet.IPv4(100), 8).Ptr(),
+					bnet.NewPfx(bnet.IPv4(200), 8).Ptr(),
+					bnet.NewPfx(bnet.IPv4(300), 8).Ptr(),
 				},
 			},
-			delete: bnet.NewPfx(bnet.IPv4(100), 8),
+			delete: bnet.NewPfx(bnet.IPv4(100), 8).Ptr(),
 			expected: &Device{
-				Addrs: []bnet.Prefix{
-					bnet.NewPfx(bnet.IPv4(200), 8),
-					bnet.NewPfx(bnet.IPv4(300), 8),
+				Addrs: []*bnet.Prefix{
+					bnet.NewPfx(bnet.IPv4(200), 8).Ptr(),
+					bnet.NewPfx(bnet.IPv4(300), 8).Ptr(),
 				},
 			},
 		},
@@ -90,21 +90,21 @@ func TestDeviceAddAddr(t *testing.T) {
 	tests := []struct {
 		name     string
 		dev      *Device
-		input    bnet.Prefix
+		input    *bnet.Prefix
 		expected *Device
 	}{
 		{
 			name: "Test #1",
 			dev: &Device{
-				Addrs: []bnet.Prefix{
-					bnet.NewPfx(bnet.IPv4(100), 8),
+				Addrs: []*bnet.Prefix{
+					bnet.NewPfx(bnet.IPv4(100), 8).Ptr(),
 				},
 			},
-			input: bnet.NewPfx(bnet.IPv4(200), 8),
+			input: bnet.NewPfx(bnet.IPv4(200), 8).Ptr(),
 			expected: &Device{
-				Addrs: []bnet.Prefix{
-					bnet.NewPfx(bnet.IPv4(100), 8),
-					bnet.NewPfx(bnet.IPv4(200), 8),
+				Addrs: []*bnet.Prefix{
+					bnet.NewPfx(bnet.IPv4(100), 8).Ptr(),
+					bnet.NewPfx(bnet.IPv4(200), 8).Ptr(),
 				},
 			},
 		},

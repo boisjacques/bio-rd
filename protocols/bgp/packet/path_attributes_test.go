@@ -19,10 +19,18 @@ func TestDecodePathAttrs(t *testing.T) {
 		{
 			name: "Valid attribute set",
 			input: []byte{
-				0,              // Attr. Flags
-				1,              // Attr. Type Code
-				1,              // Attr. Length
-				1,              // EGP
+				0, // Attr. Flags
+				1, // Attr. Type Code
+				1, // Attr. Length
+				1, // EGP
+
+				0, // Flags
+				2, // AS Path
+				8, // Length
+				1, // AS_SEQUENCE
+				3, // Path Length
+				0, 100, 0, 222, 0, 240,
+
 				0,              // Attr. Flags
 				3,              // Next Hop
 				4,              // Attr. Length
@@ -34,9 +42,19 @@ func TestDecodePathAttrs(t *testing.T) {
 				Length:   1,
 				Value:    uint8(1),
 				Next: &PathAttribute{
-					TypeCode: 3,
-					Length:   4,
-					Value:    bnet.IPv4FromOctets(10, 20, 30, 40),
+					TypeCode: 2,
+					Length:   8,
+					Value: &types.ASPath{
+						{
+							Type: 1,
+							ASNs: []uint32{100, 222, 240},
+						},
+					},
+					Next: &PathAttribute{
+						TypeCode: 3,
+						Length:   4,
+						Value:    bnet.IPv4FromOctets(10, 20, 30, 40).Ptr(),
+					},
 				},
 			},
 		},
@@ -197,7 +215,7 @@ func TestDecodePathAttr(t *testing.T) {
 				Partial:        false,
 				ExtendedLength: false,
 				TypeCode:       OriginatorIDAttr,
-				Value:          bnet.IPv4FromOctets(1, 2, 3, 4).ToUint32(),
+				Value:          bnet.IPv4FromOctets(1, 2, 3, 4).Ptr().ToUint32(),
 			},
 		},
 		{
@@ -213,8 +231,8 @@ func TestDecodePathAttr(t *testing.T) {
 				TypeCode: ClusterListAttr,
 				Optional: true,
 				Length:   4,
-				Value: []uint32{
-					bnet.IPv4FromOctets(1, 1, 1, 1).ToUint32(),
+				Value: &types.ClusterList{
+					bnet.IPv4FromOctets(1, 1, 1, 1).Ptr().ToUint32(),
 				},
 			},
 		},
@@ -231,8 +249,8 @@ func TestDecodePathAttr(t *testing.T) {
 				TypeCode: ClusterListAttr,
 				Optional: true,
 				Length:   8,
-				Value: []uint32{
-					bnet.IPv4FromOctets(1, 2, 3, 4).ToUint32(), bnet.IPv4FromOctets(8, 8, 8, 8).ToUint32(),
+				Value: &types.ClusterList{
+					bnet.IPv4FromOctets(1, 2, 3, 4).Ptr().ToUint32(), bnet.IPv4FromOctets(8, 8, 8, 8).Ptr().ToUint32(),
 				},
 			},
 		},
@@ -353,7 +371,7 @@ func TestDecodeASPath(t *testing.T) {
 			wantFail: false,
 			expected: &PathAttribute{
 				Length: 10,
-				Value: types.ASPath{
+				Value: &types.ASPath{
 					types.ASPathSegment{
 						Type: 2,
 						ASNs: []uint32{
@@ -373,7 +391,7 @@ func TestDecodeASPath(t *testing.T) {
 			wantFail: false,
 			expected: &PathAttribute{
 				Length: 8,
-				Value: types.ASPath{
+				Value: &types.ASPath{
 					types.ASPathSegment{
 						Type: 1,
 						ASNs: []uint32{
@@ -394,7 +412,7 @@ func TestDecodeASPath(t *testing.T) {
 			use4OctetASNs: true,
 			expected: &PathAttribute{
 				Length: 14,
-				Value: types.ASPath{
+				Value: &types.ASPath{
 					types.ASPathSegment{
 						Type: 1,
 						ASNs: []uint32{
@@ -471,7 +489,7 @@ func TestDecodeNextHop(t *testing.T) {
 			wantFail: false,
 			expected: &PathAttribute{
 				Length: 4,
-				Value:  bnet.IPv4FromOctets(10, 20, 30, 40),
+				Value:  bnet.IPv4FromOctets(10, 20, 30, 40).Ptr(),
 			},
 		},
 		{
@@ -640,7 +658,7 @@ func TestDecodeAggregator(t *testing.T) {
 				Length: 6,
 				Value: types.Aggregator{
 					ASN:     222,
-					Address: bnet.IPv4FromOctets(10, 20, 30, 40).ToUint32(),
+					Address: bnet.IPv4FromOctets(10, 20, 30, 40).Ptr().ToUint32(),
 				},
 			},
 		},
@@ -709,7 +727,7 @@ func TestDecodeLargeCommunity(t *testing.T) {
 			wantFail: false,
 			expected: &PathAttribute{
 				Length: 24,
-				Value: []types.LargeCommunity{
+				Value: &types.LargeCommunities{
 					{
 						GlobalAdministrator: 1,
 						DataPart1:           2,
@@ -729,7 +747,7 @@ func TestDecodeLargeCommunity(t *testing.T) {
 			wantFail: false,
 			expected: &PathAttribute{
 				Length: 0,
-				Value:  []types.LargeCommunity{},
+				Value:  &types.LargeCommunities{},
 			},
 		},
 	}
@@ -777,7 +795,7 @@ func TestDecodeCommunity(t *testing.T) {
 			wantFail: false,
 			expected: &PathAttribute{
 				Length: 8,
-				Value: []uint32{
+				Value: &types.Communities{
 					131080, 16778241,
 				},
 			},
@@ -788,7 +806,7 @@ func TestDecodeCommunity(t *testing.T) {
 			wantFail: false,
 			expected: &PathAttribute{
 				Length: 0,
-				Value:  []uint32{},
+				Value:  &types.Communities{},
 			},
 		},
 	}
@@ -834,7 +852,7 @@ func TestDecodeClusterList(t *testing.T) {
 			wantFail: false,
 			expected: &PathAttribute{
 				Length: 0,
-				Value:  []uint32{},
+				Value:  &types.ClusterList{},
 			},
 		},
 		{
@@ -845,8 +863,8 @@ func TestDecodeClusterList(t *testing.T) {
 			wantFail: false,
 			expected: &PathAttribute{
 				Length: 4,
-				Value: []uint32{
-					bnet.IPv4FromOctets(1, 1, 1, 1).ToUint32(),
+				Value: &types.ClusterList{
+					bnet.IPv4FromOctets(1, 1, 1, 1).Ptr().ToUint32(),
 				},
 			},
 		},
@@ -858,8 +876,8 @@ func TestDecodeClusterList(t *testing.T) {
 			wantFail: false,
 			expected: &PathAttribute{
 				Length: 8,
-				Value: []uint32{
-					bnet.IPv4FromOctets(1, 2, 3, 4).ToUint32(), bnet.IPv4FromOctets(8, 8, 8, 8).ToUint32(),
+				Value: &types.ClusterList{
+					bnet.IPv4FromOctets(1, 2, 3, 4).Ptr().ToUint32(), bnet.IPv4FromOctets(8, 8, 8, 8).Ptr().ToUint32(),
 				},
 			},
 		},
@@ -903,7 +921,7 @@ func TestDecodeMultiProtocolReachNLRI(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          []byte
-		addPath        bool
+		opt            *DecodeOptions
 		wantFail       bool
 		explicitLength uint16
 		expected       *PathAttribute
@@ -911,6 +929,7 @@ func TestDecodeMultiProtocolReachNLRI(t *testing.T) {
 		{
 			name:           "incomplete",
 			input:          []byte{0, 0, 0, 0},
+			opt:            &DecodeOptions{},
 			wantFail:       true,
 			explicitLength: 32,
 		},
@@ -923,14 +942,38 @@ func TestDecodeMultiProtocolReachNLRI(t *testing.T) {
 				0x00,                                     // RESERVED
 				0x30, 0x26, 0x00, 0x00, 0x06, 0xff, 0x05, // Prefix
 			},
+			opt: &DecodeOptions{},
 			expected: &PathAttribute{
 				Length: 28,
 				Value: MultiProtocolReachNLRI{
 					AFI:     IPv6AFI,
 					SAFI:    UnicastSAFI,
-					NextHop: bnet.IPv6FromBlocks(0x2001, 0x678, 0x1e0, 0, 0, 0, 0, 0x2),
+					NextHop: bnet.IPv6FromBlocks(0x2001, 0x678, 0x1e0, 0, 0, 0, 0, 0x2).Ptr(),
 					NLRI: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv6FromBlocks(0x2600, 0x6, 0xff05, 0, 0, 0, 0, 0), 48),
+						Prefix: bnet.NewPfx(bnet.IPv6FromBlocks(0x2600, 0x6, 0xff05, 0, 0, 0, 0, 0), 48).Ptr(),
+					},
+				},
+			},
+		},
+		{
+			name: "valid MP_REACH_NLRI with two next-hops",
+			input: []byte{
+				0x00, 0x02, // AFI
+				0x01,                                                                                                 // SAFI
+				0x20, 0x20, 0x01, 0x06, 0x78, 0x01, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, // NextHop
+				0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // Link Local NextHop
+				0x00,                                     // RESERVED
+				0x30, 0x26, 0x00, 0x00, 0x06, 0xff, 0x05, // Prefix
+			},
+			opt: &DecodeOptions{},
+			expected: &PathAttribute{
+				Length: 44,
+				Value: MultiProtocolReachNLRI{
+					AFI:     IPv6AFI,
+					SAFI:    UnicastSAFI,
+					NextHop: bnet.IPv6FromBlocks(0x2001, 0x678, 0x1e0, 0, 0, 0, 0, 0x2).Ptr(),
+					NLRI: &NLRI{
+						Prefix: bnet.NewPfx(bnet.IPv6FromBlocks(0x2600, 0x6, 0xff05, 0, 0, 0, 0, 0), 48).Ptr(),
 					},
 				},
 			},
@@ -940,6 +983,7 @@ func TestDecodeMultiProtocolReachNLRI(t *testing.T) {
 			input: []byte{
 				0x00, 0x02, // AFI
 			},
+			opt:      &DecodeOptions{},
 			wantFail: true,
 		},
 		{
@@ -949,6 +993,7 @@ func TestDecodeMultiProtocolReachNLRI(t *testing.T) {
 				0x01,                                           // SAFI
 				0x10, 0x20, 0x01, 0x06, 0x78, 0x01, 0xe0, 0x00, // incomplete NextHop
 			},
+			opt:      &DecodeOptions{},
 			wantFail: true,
 		},
 		{
@@ -959,12 +1004,13 @@ func TestDecodeMultiProtocolReachNLRI(t *testing.T) {
 				0x10, 0x20, 0x01, 0x06, 0x78, 0x01, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, // NextHop
 				0x00, // RESERVED
 			},
+			opt: &DecodeOptions{},
 			expected: &PathAttribute{
 				Length: 21,
 				Value: MultiProtocolReachNLRI{
 					AFI:     IPv6AFI,
 					SAFI:    UnicastSAFI,
-					NextHop: bnet.IPv6FromBlocks(0x2001, 0x678, 0x1e0, 0, 0, 0, 0, 0x2),
+					NextHop: bnet.IPv6FromBlocks(0x2001, 0x678, 0x1e0, 0, 0, 0, 0, 0x2).Ptr(),
 				},
 			},
 		},
@@ -977,7 +1023,34 @@ func TestDecodeMultiProtocolReachNLRI(t *testing.T) {
 				0x00,             // RESERVED
 				0x30, 0x26, 0x00, // Prefix
 			},
+			opt:      &DecodeOptions{},
 			wantFail: true,
+		},
+		{
+			name: "valid MP_REACH_NLRI with addPath",
+			input: []byte{
+				0x00, 0x02, // AFI
+				0x01,                                                                                                 // SAFI
+				0x10, 0x20, 0x01, 0x06, 0x78, 0x01, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, // NextHop
+				0x00, // RESERVED
+				0x00, 0x00, 0x00, 0x01,
+				0x30, 0x26, 0x00, 0x00, 0x06, 0xff, 0x05, // Prefix
+			},
+			opt: &DecodeOptions{
+				AddPathIPv6Unicast: true,
+			},
+			expected: &PathAttribute{
+				Length: 32,
+				Value: MultiProtocolReachNLRI{
+					AFI:     IPv6AFI,
+					SAFI:    UnicastSAFI,
+					NextHop: bnet.IPv6FromBlocks(0x2001, 0x678, 0x1e0, 0, 0, 0, 0, 0x2).Ptr(),
+					NLRI: &NLRI{
+						PathIdentifier: 1,
+						Prefix:         bnet.NewPfx(bnet.IPv6FromBlocks(0x2600, 0x6, 0xff05, 0, 0, 0, 0, 0), 48).Ptr(),
+					},
+				},
+			},
 		},
 	}
 
@@ -993,7 +1066,7 @@ func TestDecodeMultiProtocolReachNLRI(t *testing.T) {
 			pa := &PathAttribute{
 				Length: l,
 			}
-			err := pa.decodeMultiProtocolReachNLRI(bytes.NewBuffer(test.input), test.addPath)
+			err := pa.decodeMultiProtocolReachNLRI(bytes.NewBuffer(test.input), test.opt)
 
 			if test.wantFail {
 				if err != nil {
@@ -1038,7 +1111,7 @@ func TestDecodeMultiProtocolUnreachNLRI(t *testing.T) {
 					AFI:  IPv6AFI,
 					SAFI: UnicastSAFI,
 					NLRI: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv6FromBlocks(0x2620, 0x110, 0x9000, 0, 0, 0, 0, 0), 44),
+						Prefix: bnet.NewPfx(bnet.IPv6FromBlocks(0x2620, 0x110, 0x9000, 0, 0, 0, 0, 0), 44).Ptr(),
 					},
 				},
 			},
@@ -1073,7 +1146,7 @@ func TestDecodeMultiProtocolUnreachNLRI(t *testing.T) {
 			pa := &PathAttribute{
 				Length: l,
 			}
-			err := pa.decodeMultiProtocolUnreachNLRI(bytes.NewBuffer(test.input), false)
+			err := pa.decodeMultiProtocolUnreachNLRI(bytes.NewBuffer(test.input), &DecodeOptions{})
 
 			if test.wantFail {
 				if err != nil {
@@ -1086,7 +1159,7 @@ func TestDecodeMultiProtocolUnreachNLRI(t *testing.T) {
 				t.Fatalf("Unexpected failure for test %q: %v", test.name, err)
 			}
 
-			assert.Equal(t, test.expected, pa)
+			assert.Equal(t, test.expected, pa, test.name)
 		})
 	}
 }
@@ -1350,7 +1423,7 @@ func TestSerializeNextHop(t *testing.T) {
 			name: "Test #1",
 			input: &PathAttribute{
 				TypeCode: NextHopAttr,
-				Value:    bnet.IPv4FromOctets(100, 110, 120, 130),
+				Value:    bnet.IPv4FromOctets(100, 110, 120, 130).Ptr(),
 			},
 			expected:    []byte{64, 3, 4, 100, 110, 120, 130},
 			expectedLen: 7,
@@ -1485,7 +1558,7 @@ func TestSerializeAggregator(t *testing.T) {
 				TypeCode: AggregatorAttr,
 				Value: types.Aggregator{
 					ASN:     174,
-					Address: bnet.IPv4FromOctets(10, 20, 30, 40).ToUint32(),
+					Address: bnet.IPv4FromOctets(10, 20, 30, 40).Ptr().ToUint32(),
 				},
 			},
 			expected: []byte{
@@ -1516,14 +1589,14 @@ func TestSerializeASPath(t *testing.T) {
 		name        string
 		input       *PathAttribute
 		expected    []byte
-		expectedLen uint8
+		expectedLen uint16
 		use32BitASN bool
 	}{
 		{
 			name: "Test #1",
 			input: &PathAttribute{
 				TypeCode: ASPathAttr,
-				Value: types.ASPath{
+				Value: &types.ASPath{
 					{
 						Type: 2, // Sequence
 						ASNs: []uint32{
@@ -1542,13 +1615,13 @@ func TestSerializeASPath(t *testing.T) {
 				0, 200, // ASN 200
 				0, 210, // ASN 210
 			},
-			expectedLen: 10,
+			expectedLen: 11,
 		},
 		{
 			name: "32bit ASN",
 			input: &PathAttribute{
 				TypeCode: ASPathAttr,
-				Value: types.ASPath{
+				Value: &types.ASPath{
 					{
 						Type: 2, // Sequence
 						ASNs: []uint32{
@@ -1567,7 +1640,7 @@ func TestSerializeASPath(t *testing.T) {
 				0, 0, 0, 200, // ASN 200
 				0, 0, 0, 210, // ASN 210
 			},
-			expectedLen: 16,
+			expectedLen: 17,
 			use32BitASN: true,
 		},
 	}
@@ -1595,13 +1668,13 @@ func TestSerializeLargeCommunities(t *testing.T) {
 		name        string
 		input       *PathAttribute
 		expected    []byte
-		expectedLen uint8
+		expectedLen uint16
 	}{
 		{
 			name: "2 large communities",
 			input: &PathAttribute{
 				TypeCode: LargeCommunitiesAttr,
-				Value: []types.LargeCommunity{
+				Value: &types.LargeCommunities{
 					{
 						GlobalAdministrator: 1,
 						DataPart1:           2,
@@ -1620,13 +1693,13 @@ func TestSerializeLargeCommunities(t *testing.T) {
 				24,                                                                     // Length
 				0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, // Communities (1, 2, 3), (4, 5, 6)
 			},
-			expectedLen: 24,
+			expectedLen: 27,
 		},
 		{
 			name: "empty list of communities",
 			input: &PathAttribute{
 				TypeCode: LargeCommunitiesAttr,
-				Value:    []types.LargeCommunity{},
+				Value:    nil,
 			},
 			expected:    []byte{},
 			expectedLen: 0,
@@ -1651,13 +1724,13 @@ func TestSerializeCommunities(t *testing.T) {
 		name        string
 		input       *PathAttribute
 		expected    []byte
-		expectedLen uint8
+		expectedLen uint16
 	}{
 		{
 			name: "2 communities",
 			input: &PathAttribute{
 				TypeCode: CommunitiesAttr,
-				Value: []uint32{
+				Value: &types.Communities{
 					131080, 16778241,
 				},
 			},
@@ -1667,13 +1740,13 @@ func TestSerializeCommunities(t *testing.T) {
 				8,                      // Length
 				0, 2, 0, 8, 1, 0, 4, 1, // Communities (2,8), (256,1025)
 			},
-			expectedLen: 8,
+			expectedLen: 11,
 		},
 		{
 			name: "empty list of communities",
 			input: &PathAttribute{
 				TypeCode: CommunitiesAttr,
-				Value:    []uint32{},
+				Value:    &types.Communities{},
 			},
 			expected:    []byte{},
 			expectedLen: 0,
@@ -1704,7 +1777,7 @@ func TestSerializeOriginatorID(t *testing.T) {
 			name: "Valid OriginatorID",
 			input: &PathAttribute{
 				TypeCode: OriginatorIDAttr,
-				Value:    bnet.IPv4FromOctets(1, 1, 1, 1).ToUint32(),
+				Value:    bnet.IPv4FromOctets(1, 1, 1, 1).Ptr().ToUint32(),
 			},
 			expected: []byte{
 				setOptional(uint8(0)), // Attribute flags
@@ -1737,10 +1810,10 @@ func TestSerializeClusterList(t *testing.T) {
 		expectedLen uint8
 	}{
 		{
-			name: "Empty list of CluserIDs",
+			name: "Empty list of ClusterIDs",
 			input: &PathAttribute{
 				TypeCode: ClusterListAttr,
-				Value:    []uint32{},
+				Value:    &types.ClusterList{},
 			},
 			expected:    []byte{},
 			expectedLen: 0,
@@ -1749,8 +1822,8 @@ func TestSerializeClusterList(t *testing.T) {
 			name: "One ClusterID",
 			input: &PathAttribute{
 				TypeCode: ClusterListAttr,
-				Value: []uint32{
-					bnet.IPv4FromOctets(1, 1, 1, 1).ToUint32(),
+				Value: &types.ClusterList{
+					bnet.IPv4FromOctets(1, 1, 1, 1).Ptr().ToUint32(),
 				},
 			},
 			expected: []byte{
@@ -1759,15 +1832,15 @@ func TestSerializeClusterList(t *testing.T) {
 				4,                     // Length
 				1, 1, 1, 1,            // ClusterID (1.1.1.1)
 			},
-			expectedLen: 4,
+			expectedLen: 7,
 		},
 		{
 			name: "Two ClusterIDs",
 			input: &PathAttribute{
 				TypeCode: ClusterListAttr,
-				Value: []uint32{
-					bnet.IPv4FromOctets(1, 1, 1, 1).ToUint32(),
-					bnet.IPv4FromOctets(192, 168, 23, 42).ToUint32(),
+				Value: &types.ClusterList{
+					bnet.IPv4FromOctets(1, 1, 1, 1).Ptr().ToUint32(),
+					bnet.IPv4FromOctets(192, 168, 23, 42).Ptr().ToUint32(),
 				},
 			},
 			expected: []byte{
@@ -1776,7 +1849,7 @@ func TestSerializeClusterList(t *testing.T) {
 				8,                            // Length
 				1, 1, 1, 1, 192, 168, 23, 42, // ClusterID (1.1.1.1)
 			},
-			expectedLen: 8,
+			expectedLen: 11,
 		},
 	}
 
@@ -1813,7 +1886,7 @@ func TestSerializeUnknownAttribute(t *testing.T) {
 				4,          // Length
 				1, 2, 3, 4, // Payload
 			},
-			expectedLen: 6,
+			expectedLen: 7,
 		},
 		{
 			name: "Extended length",
@@ -1843,7 +1916,7 @@ func TestSerializeUnknownAttribute(t *testing.T) {
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // Payload
 			},
-			expectedLen: 258,
+			expectedLen: 259,
 		},
 	}
 
@@ -1852,7 +1925,7 @@ func TestSerializeUnknownAttribute(t *testing.T) {
 			buf := bytes.NewBuffer(nil)
 			n := test.input.serializeUnknownAttribute(buf)
 
-			assert.Equal(t, test.expectedLen, n)
+			assert.Equal(t, test.expectedLen, n, test.name)
 			assert.Equal(t, test.expected, buf.Bytes())
 		})
 	}
@@ -1869,7 +1942,7 @@ func TestSerialize(t *testing.T) {
 			name: "Withdraw only",
 			msg: &BGPUpdate{
 				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(100, 110, 120, 0), 24),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(100, 110, 120, 0), 24).Ptr(),
 				},
 			},
 			expected: []byte{
@@ -1885,7 +1958,7 @@ func TestSerialize(t *testing.T) {
 			name: "NLRI only",
 			msg: &BGPUpdate{
 				NLRI: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(100, 110, 128, 0), 17),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(100, 110, 128, 0), 17).Ptr(),
 				},
 			},
 			expected: []byte{
@@ -1923,9 +1996,9 @@ func TestSerialize(t *testing.T) {
 			name: "Full test",
 			msg: &BGPUpdate{
 				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16).Ptr(),
 					},
 				},
 				PathAttributes: &PathAttribute{
@@ -1933,7 +2006,7 @@ func TestSerialize(t *testing.T) {
 					Value:    uint8(0),
 					Next: &PathAttribute{
 						TypeCode: ASPathAttr,
-						Value: types.ASPath{
+						Value: &types.ASPath{
 							{
 								Type: 2,
 								ASNs: []uint32{100, 155, 200},
@@ -1945,7 +2018,7 @@ func TestSerialize(t *testing.T) {
 						},
 						Next: &PathAttribute{
 							TypeCode: NextHopAttr,
-							Value:    bnet.IPv4FromOctets(10, 20, 30, 40),
+							Value:    bnet.IPv4FromOctets(10, 20, 30, 40).Ptr(),
 							Next: &PathAttribute{
 								TypeCode: MEDAttr,
 								Value:    uint32(100),
@@ -1958,7 +2031,7 @@ func TestSerialize(t *testing.T) {
 											TypeCode: AggregatorAttr,
 											Value: types.Aggregator{
 												ASN:     200,
-												Address: bnet.IPv4FromOctets(10, 20, 30, 40).ToUint32(),
+												Address: bnet.IPv4FromOctets(10, 20, 30, 40).Ptr().ToUint32(),
 											},
 										},
 									},
@@ -1968,9 +2041,9 @@ func TestSerialize(t *testing.T) {
 					},
 				},
 				NLRI: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(8, 8, 8, 0), 24),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(8, 8, 8, 0), 24).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(185, 65, 240, 0), 22),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(185, 65, 240, 0), 22).Ptr(),
 					},
 				},
 			},
@@ -2032,45 +2105,6 @@ func TestSerialize(t *testing.T) {
 				22, 185, 65, 240, // 185.65.240.0/22
 			},
 		},
-		{
-			name: "Reflected NLRI",
-			msg: &BGPUpdate{
-				NLRI: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(100, 110, 128, 0), 17),
-				},
-				PathAttributes: &PathAttribute{
-					TypeCode: OriginatorIDAttr,
-					Value:    bnet.IPv4FromOctets(9, 8, 7, 6).ToUint32(),
-					Next: &PathAttribute{
-						TypeCode: ClusterListAttr,
-						Value: []uint32{
-							bnet.IPv4FromOctets(1, 2, 3, 4).ToUint32(),
-						},
-					},
-				},
-			},
-			expected: []byte{
-				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-				0, 41, // Length
-				2,    // Msg Type
-				0, 0, // Withdrawn Routes Length
-
-				0, 14, // Total Path Attribute Length
-				// OriginatorID
-				128,        // Attr. Flags (Opt.)
-				9,          // Attr. Type Code
-				4,          // Attr Length
-				9, 8, 7, 6, // 9.8.7.6
-
-				// ClusterList
-				128, // Attr Flags (Opt.)
-				10,  // Attr. Type Code
-				4,
-				1, 2, 3, 4,
-
-				17, 100, 110, 128, // NLRI
-			},
-		},
 	}
 
 	for _, test := range tests {
@@ -2105,7 +2139,7 @@ func TestSerializeAddPath(t *testing.T) {
 			msg: &BGPUpdate{
 				WithdrawnRoutes: &NLRI{
 					PathIdentifier: 257,
-					Prefix:         bnet.NewPfx(bnet.IPv4FromOctets(100, 110, 120, 0), 24),
+					Prefix:         bnet.NewPfx(bnet.IPv4FromOctets(100, 110, 120, 0), 24).Ptr(),
 				},
 			},
 			expected: []byte{
@@ -2123,7 +2157,7 @@ func TestSerializeAddPath(t *testing.T) {
 			msg: &BGPUpdate{
 				NLRI: &NLRI{
 					PathIdentifier: 257,
-					Prefix:         bnet.NewPfx(bnet.IPv4FromOctets(100, 110, 128, 0), 17),
+					Prefix:         bnet.NewPfx(bnet.IPv4FromOctets(100, 110, 128, 0), 17).Ptr(),
 				},
 			},
 			expected: []byte{
@@ -2162,9 +2196,9 @@ func TestSerializeAddPath(t *testing.T) {
 			name: "Full test",
 			msg: &BGPUpdate{
 				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16).Ptr(),
 					},
 				},
 				PathAttributes: &PathAttribute{
@@ -2172,7 +2206,7 @@ func TestSerializeAddPath(t *testing.T) {
 					Value:    uint8(0),
 					Next: &PathAttribute{
 						TypeCode: ASPathAttr,
-						Value: types.ASPath{
+						Value: &types.ASPath{
 							{
 								Type: 2,
 								ASNs: []uint32{100, 155, 200},
@@ -2184,7 +2218,7 @@ func TestSerializeAddPath(t *testing.T) {
 						},
 						Next: &PathAttribute{
 							TypeCode: NextHopAttr,
-							Value:    bnet.IPv4FromOctets(10, 20, 30, 40),
+							Value:    bnet.IPv4FromOctets(10, 20, 30, 40).Ptr(),
 							Next: &PathAttribute{
 								TypeCode: MEDAttr,
 								Value:    uint32(100),
@@ -2197,7 +2231,7 @@ func TestSerializeAddPath(t *testing.T) {
 											TypeCode: AggregatorAttr,
 											Value: types.Aggregator{
 												ASN:     200,
-												Address: bnet.IPv4FromOctets(10, 20, 30, 40).ToUint32(),
+												Address: bnet.IPv4FromOctets(10, 20, 30, 40).Ptr().ToUint32(),
 											},
 										},
 									},
@@ -2207,9 +2241,9 @@ func TestSerializeAddPath(t *testing.T) {
 					},
 				},
 				NLRI: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(8, 8, 8, 0), 24),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(8, 8, 8, 0), 24).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(185, 65, 240, 0), 22),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(185, 65, 240, 0), 22).Ptr(),
 					},
 				},
 			},
@@ -2323,5 +2357,29 @@ func TestFourBytesToUint32(t *testing.T) {
 		if res != test.expected {
 			t.Errorf("Unexpected result for test %q: Got: %d Want: %d", test.name, res, test.expected)
 		}
+	}
+}
+
+func TestDecode4ByteASN(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *bytes.Buffer
+		expected uint32
+	}{
+		{
+			name:     "Test #1",
+			input:    bytes.NewBuffer([]byte{0b00000000, 0b00000011, 0b00010011, 0b11100101}),
+			expected: 201701,
+		},
+	}
+
+	for _, test := range tests {
+		res, err := decode4ByteASN(test.input)
+		if err != nil {
+			t.Errorf("error in test %q: %v", test.name, err)
+			continue
+		}
+
+		assert.Equal(t, test.expected, res, test.name)
 	}
 }

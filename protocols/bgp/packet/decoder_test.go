@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/bio-routing/bio-rd/net"
 	bnet "github.com/bio-routing/bio-rd/net"
 	"github.com/bio-routing/bio-rd/protocols/bgp/types"
 	"github.com/bio-routing/tflow2/convert"
@@ -209,9 +210,9 @@ func TestDecode(t *testing.T) {
 				Body: &BGPUpdate{
 					WithdrawnRoutesLen: 5,
 					WithdrawnRoutes: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 						Next: &NLRI{
-							Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
+							Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16).Ptr(),
 						},
 					},
 				},
@@ -386,7 +387,7 @@ func TestDecodeNotificationMsg(t *testing.T) {
 		},
 		{
 			name:     "Cease (invalid subcode)",
-			input:    []byte{6, 1},
+			input:    []byte{6, 9},
 			wantFail: true,
 		},
 	}
@@ -427,76 +428,49 @@ func TestDecodeUpdateMsg(t *testing.T) {
 			expected: &BGPUpdate{
 				WithdrawnRoutesLen: 5,
 				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16).Ptr(),
 					},
 				},
 			},
 		},
 		{
-			// 2 withdraws with one path attribute (ORIGIN), valid update
+			// 2 withdraws with mandatory attributes, valid update
 			testNum: 2,
 			input: []byte{
 				0, 5, // Withdrawn Routes Length
 				8, 10, // 10.0.0.0/8
 				16, 192, 168, // 192.168.0.0/16
-				0, 5, // Total Path Attribute Length
+				0, 23, // Total Path Attribute Length
+
 				255,  // Attribute flags
 				1,    // Attribute Type code
 				0, 1, // Length
 				2, // INCOMPLETE
+
+				0, // Flags
+				2, // AS Path
+				8, // Length
+				1, // AS_SEQUENCE
+				3, // Path Length
+				0, 100, 0, 222, 0, 240,
+
+				0,              // Attr. Flags
+				3,              // Next Hop
+				4,              // Attr. Length
+				10, 20, 30, 40, // IP-Address
 			},
 			wantFail: false,
 			expected: &BGPUpdate{
 				WithdrawnRoutesLen: 5,
 				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16).Ptr(),
 					},
 				},
-				TotalPathAttrLen: 5,
-				PathAttributes: &PathAttribute{
-					Optional:       true,
-					Transitive:     true,
-					Partial:        true,
-					ExtendedLength: true,
-					Length:         1,
-					TypeCode:       1,
-					Value:          uint8(2),
-				},
-			},
-		},
-		{
-			// 2 withdraws with two path attributes (ORIGIN + ASPath), valid update
-			testNum: 3,
-			input: []byte{0, 5, 8, 10, 16, 192, 168,
-				0, 14, // Total Path Attribute Length
-
-				255,  // Attribute flags
-				1,    // Attribute Type code (ORIGIN)
-				0, 1, // Length
-				2, // INCOMPLETE
-
-				0,      // Attribute flags
-				2,      // Attribute Type code (AS Path)
-				6,      // Length
-				2,      // Type = AS_SEQUENCE
-				2,      // Path Segment Length
-				59, 65, // AS15169
-				12, 248, // AS3320
-			},
-			wantFail: false,
-			expected: &BGPUpdate{
-				WithdrawnRoutesLen: 5,
-				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
-					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
-					},
-				},
-				TotalPathAttrLen: 14,
+				TotalPathAttrLen: 23,
 				PathAttributes: &PathAttribute{
 					Optional:       true,
 					Transitive:     true,
@@ -510,16 +484,22 @@ func TestDecodeUpdateMsg(t *testing.T) {
 						Transitive:     false,
 						Partial:        false,
 						ExtendedLength: false,
-						Length:         6,
+						Length:         8,
 						TypeCode:       2,
-						Value: types.ASPath{
+						Value: &types.ASPath{
 							{
-								Type: 2,
-								ASNs: []uint32{
-									15169,
-									3320,
-								},
+								Type: 1,
+								ASNs: []uint32{100, 222, 240},
 							},
+						},
+						Next: &PathAttribute{
+							Optional:       false,
+							Transitive:     false,
+							Partial:        false,
+							ExtendedLength: false,
+							Length:         4,
+							TypeCode:       3,
+							Value:          net.IPv4FromOctets(10, 20, 30, 40).Ptr(),
 						},
 					},
 				},
@@ -566,74 +546,6 @@ func TestDecodeUpdateMsg(t *testing.T) {
 			wantFail: true,
 		},
 		{
-			// 2 withdraws with two path attributes (ORIGIN + ASPath), valid update
-			testNum: 6,
-			input: []byte{0, 5, 8, 10, 16, 192, 168,
-				0, 20, // Total Path Attribute Length
-
-				255,  // Attribute flags
-				1,    // Attribute Type code (ORIGIN)
-				0, 1, // Length
-				2, // INCOMPLETE
-
-				0,      // Attribute flags
-				2,      // Attribute Type code (AS Path)
-				12,     // Length
-				2,      // Type = AS_SEQUENCE
-				2,      // Path Segment Length
-				59, 65, // AS15169
-				12, 248, // AS3320
-				1,      // Type = AS_SET
-				2,      // Path Segment Length
-				59, 65, // AS15169
-				12, 248, // AS3320
-			},
-			wantFail: false,
-			expected: &BGPUpdate{
-				WithdrawnRoutesLen: 5,
-				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
-					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
-					},
-				},
-				TotalPathAttrLen: 20,
-				PathAttributes: &PathAttribute{
-					Optional:       true,
-					Transitive:     true,
-					Partial:        true,
-					ExtendedLength: true,
-					Length:         1,
-					TypeCode:       1,
-					Value:          uint8(2),
-					Next: &PathAttribute{
-						Optional:       false,
-						Transitive:     false,
-						Partial:        false,
-						ExtendedLength: false,
-						Length:         12,
-						TypeCode:       2,
-						Value: types.ASPath{
-							{
-								Type: 2,
-								ASNs: []uint32{
-									15169,
-									3320,
-								},
-							},
-							{
-								Type: 1,
-								ASNs: []uint32{
-									15169,
-									3320,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
 			// 2 withdraws with 3 path attributes (ORIGIN + ASPath, NH), valid update
 			testNum: 7,
 			input: []byte{0, 5, 8, 10, 16, 192, 168,
@@ -665,9 +577,9 @@ func TestDecodeUpdateMsg(t *testing.T) {
 			expected: &BGPUpdate{
 				WithdrawnRoutesLen: 5,
 				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16).Ptr(),
 					},
 				},
 				TotalPathAttrLen: 27,
@@ -688,7 +600,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 						ExtendedLength: false,
 						Length:         12,
 						TypeCode:       2,
-						Value: types.ASPath{
+						Value: &types.ASPath{
 							{
 								Type: 2,
 								ASNs: []uint32{
@@ -711,7 +623,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 							ExtendedLength: false,
 							Length:         4,
 							TypeCode:       3,
-							Value:          bnet.IPv4FromOctets(10, 11, 12, 13),
+							Value:          bnet.IPv4FromOctets(10, 11, 12, 13).Ptr(),
 						},
 					},
 				},
@@ -754,9 +666,9 @@ func TestDecodeUpdateMsg(t *testing.T) {
 			expected: &BGPUpdate{
 				WithdrawnRoutesLen: 5,
 				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16).Ptr(),
 					},
 				},
 				TotalPathAttrLen: 34,
@@ -776,7 +688,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 						ExtendedLength: false,
 						Length:         12,
 						TypeCode:       2,
-						Value: types.ASPath{
+						Value: &types.ASPath{
 							{
 								Type: 2,
 								ASNs: []uint32{
@@ -799,7 +711,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 							ExtendedLength: false,
 							Length:         4,
 							TypeCode:       3,
-							Value:          bnet.IPv4FromOctets(10, 11, 12, 13),
+							Value:          bnet.IPv4FromOctets(10, 11, 12, 13).Ptr(),
 							Next: &PathAttribute{
 								Optional:       false,
 								Transitive:     false,
@@ -856,9 +768,9 @@ func TestDecodeUpdateMsg(t *testing.T) {
 			expected: &BGPUpdate{
 				WithdrawnRoutesLen: 5,
 				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16).Ptr(),
 					},
 				},
 				TotalPathAttrLen: 41,
@@ -877,7 +789,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 						ExtendedLength: false,
 						Length:         12,
 						TypeCode:       2,
-						Value: types.ASPath{
+						Value: &types.ASPath{
 							{
 								Type: 2,
 								ASNs: []uint32{
@@ -900,7 +812,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 							ExtendedLength: false,
 							Length:         4,
 							TypeCode:       3,
-							Value:          bnet.IPv4FromOctets(10, 11, 12, 13),
+							Value:          bnet.IPv4FromOctets(10, 11, 12, 13).Ptr(),
 							Next: &PathAttribute{
 								Optional:       false,
 								Transitive:     false,
@@ -970,9 +882,9 @@ func TestDecodeUpdateMsg(t *testing.T) {
 			expected: &BGPUpdate{
 				WithdrawnRoutesLen: 5,
 				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16).Ptr(),
 					},
 				},
 				TotalPathAttrLen: 44,
@@ -991,7 +903,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 						ExtendedLength: false,
 						Length:         12,
 						TypeCode:       2,
-						Value: types.ASPath{
+						Value: &types.ASPath{
 							{
 								Type: 2,
 								ASNs: []uint32{
@@ -1014,7 +926,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 							ExtendedLength: false,
 							Length:         4,
 							TypeCode:       3,
-							Value:          bnet.IPv4FromOctets(10, 11, 12, 13),
+							Value:          bnet.IPv4FromOctets(10, 11, 12, 13).Ptr(),
 							Next: &PathAttribute{
 								Optional:       false,
 								Transitive:     false,
@@ -1100,9 +1012,9 @@ func TestDecodeUpdateMsg(t *testing.T) {
 			expected: &BGPUpdate{
 				WithdrawnRoutesLen: 5,
 				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(),
 					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
+						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16).Ptr(),
 					},
 				},
 				TotalPathAttrLen: 53,
@@ -1121,7 +1033,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 						ExtendedLength: false,
 						Length:         12,
 						TypeCode:       2,
-						Value: types.ASPath{
+						Value: &types.ASPath{
 							{
 								Type: 2,
 								ASNs: []uint32{
@@ -1144,7 +1056,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 							ExtendedLength: false,
 							Length:         4,
 							TypeCode:       3,
-							Value:          bnet.IPv4FromOctets(10, 11, 12, 13),
+							Value:          bnet.IPv4FromOctets(10, 11, 12, 13).Ptr(),
 							Next: &PathAttribute{
 								Optional:       false,
 								Transitive:     false,
@@ -1177,7 +1089,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 											TypeCode:       7,
 											Value: types.Aggregator{
 												ASN:     uint16(258),
-												Address: bnet.IPv4FromOctets(10, 11, 12, 13).ToUint32(),
+												Address: bnet.IPv4FromOctets(10, 11, 12, 13).Ptr().ToUint32(),
 											},
 										},
 									},
@@ -1187,7 +1099,7 @@ func TestDecodeUpdateMsg(t *testing.T) {
 					},
 				},
 				NLRI: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(11, 0, 0, 0), 8),
+					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(11, 0, 0, 0), 8).Ptr(),
 				},
 			},
 		},
@@ -1244,54 +1156,6 @@ func TestDecodeUpdateMsg(t *testing.T) {
 					Transitive: true,
 					TypeCode:   111,
 					Value:      []byte{1, 1, 1, 1},
-				},
-			},
-		},
-		{
-			// 2 withdraws with two path attributes (Communities + Origin), valid update
-			testNum: 17,
-			input: []byte{0, 5, 8, 10, 16, 192, 168,
-				0, 16, // Total Path Attribute Length
-
-				0,          // Attribute flags
-				8,          // Attribute Type code (Community)
-				8,          // Length
-				0, 0, 1, 0, // Arbitrary Community
-				0, 0, 1, 1, // Arbitrary Community
-
-				255,  // Attribute flags
-				1,    // Attribute Type code (ORIGIN)
-				0, 1, // Length
-				2, // INCOMPLETE
-
-			},
-			wantFail: false,
-			expected: &BGPUpdate{
-				WithdrawnRoutesLen: 5,
-				WithdrawnRoutes: &NLRI{
-					Prefix: bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8),
-					Next: &NLRI{
-						Prefix: bnet.NewPfx(bnet.IPv4FromOctets(192, 168, 0, 0), 16),
-					},
-				},
-				TotalPathAttrLen: 16,
-				PathAttributes: &PathAttribute{
-					Optional:       false,
-					Transitive:     false,
-					Partial:        false,
-					ExtendedLength: false,
-					Length:         8,
-					TypeCode:       8,
-					Value:          []uint32{256, 257},
-					Next: &PathAttribute{
-						Optional:       true,
-						Transitive:     true,
-						Partial:        true,
-						ExtendedLength: true,
-						Length:         1,
-						TypeCode:       1,
-						Value:          uint8(2),
-					},
 				},
 			},
 		},
@@ -1658,14 +1522,72 @@ func TestDecodeOptParams(t *testing.T) {
 							Code:   69,
 							Length: 4,
 							Value: AddPathCapability{
-								AFI:         1,
-								SAFI:        1,
-								SendReceive: 3,
+								AddPathCapabilityTuple{
+									AFI:         1,
+									SAFI:        1,
+									SendReceive: 3,
+								},
 							},
 						},
 					},
 				},
 			},
+		},
+		{
+			name: "Add path capability with multiple entries",
+			input: []byte{
+				2,    // Type
+				6,    // Length
+				69,   // Code
+				8,    // Length
+				0, 1, // AFI
+				1, // SAFI
+				3, // Send/Receive
+
+				0, 2, // AFI
+				1, // SAFI
+				3, // Send/Receive
+			},
+			wantFail: false,
+			expected: []OptParam{
+				{
+					Type:   2,
+					Length: 6,
+					Value: Capabilities{
+						{
+							Code:   69,
+							Length: 8,
+							Value: AddPathCapability{
+								AddPathCapabilityTuple{
+									AFI:         1,
+									SAFI:        1,
+									SendReceive: 3,
+								},
+								AddPathCapabilityTuple{
+									AFI:         2,
+									SAFI:        1,
+									SendReceive: 3,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Add path capability with broken capability length",
+			input: []byte{
+				2,    // Type
+				6,    // Length
+				69,   // Code
+				5,    // Length
+				0, 1, // AFI
+				1, // SAFI
+				3, // Send/Receive
+				1, // broken value
+			},
+			wantFail: true,
+			expected: nil,
 		},
 	}
 
@@ -1704,9 +1626,11 @@ func TestDecodeCapability(t *testing.T) {
 				Code:   69,
 				Length: 4,
 				Value: AddPathCapability{
-					AFI:         1,
-					SAFI:        1,
-					SendReceive: 3,
+					AddPathCapabilityTuple{
+						AFI:         1,
+						SAFI:        1,
+						SendReceive: 3,
+					},
 				},
 			},
 			wantFail: false,
@@ -1763,9 +1687,11 @@ func TestDecodeAddPathCapability(t *testing.T) {
 			input:    []byte{0, 1, 1, 3},
 			wantFail: false,
 			expected: AddPathCapability{
-				AFI:         1,
-				SAFI:        1,
-				SendReceive: 3,
+				AddPathCapabilityTuple{
+					AFI:         1,
+					SAFI:        1,
+					SendReceive: 3,
+				},
 			},
 		},
 		{
@@ -1777,7 +1703,7 @@ func TestDecodeAddPathCapability(t *testing.T) {
 
 	for _, test := range tests {
 		buf := bytes.NewBuffer(test.input)
-		cap, err := decodeAddPathCapability(buf)
+		cap, err := decodeAddPathCapability(buf, uint8(len(test.input)))
 		if err != nil {
 			if test.wantFail {
 				continue

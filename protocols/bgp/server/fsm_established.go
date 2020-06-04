@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"time"
 
 	bnet "github.com/bio-routing/bio-rd/net"
@@ -80,7 +81,7 @@ func (s *establishedState) init() error {
 		IBGP:                 s.fsm.peer.localASN == s.fsm.peer.peerASN,
 		LocalASN:             s.fsm.peer.localASN,
 		RouteServerClient:    s.fsm.peer.routeServerClient,
-		LocalAddress:         localAddr,
+		LocalAddress:         localAddr.Dedup(),
 		RouteReflectorClient: s.fsm.peer.routeReflectorClient,
 		ClusterID:            s.fsm.peer.clusterID,
 	}
@@ -105,6 +106,10 @@ func (s *establishedState) uninit() {
 	if s.fsm.ipv6Unicast != nil {
 		s.fsm.ipv6Unicast.dispose()
 	}
+
+	s.fsm.counters.reset()
+
+	s.fsm.ribsInitialized = false
 }
 
 func (s *establishedState) manualStop() (state, string) {
@@ -192,6 +197,8 @@ func (s *establishedState) notification() (state, string) {
 }
 
 func (s *establishedState) update(u *packet.BGPUpdate) (state, string) {
+	atomic.AddUint64(&s.fsm.counters.updatesReceived, 1)
+
 	if s.fsm.holdTime != 0 {
 		s.fsm.updateLastUpdateOrKeepalive()
 	}

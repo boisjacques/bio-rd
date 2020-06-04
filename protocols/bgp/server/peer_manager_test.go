@@ -9,7 +9,7 @@ import (
 )
 
 func TestAdd(t *testing.T) {
-	ip := bnet.IPv4FromOctets(192, 168, 0, 1)
+	ip := bnet.IPv4FromOctets(192, 168, 0, 1).Ptr()
 	p := &peer{
 		addr: ip,
 	}
@@ -17,18 +17,18 @@ func TestAdd(t *testing.T) {
 	m := newPeerManager()
 	m.add(p)
 
-	found, _ := m.peers[ip]
+	found, _ := m.peers[*ip]
 	assert.Exactly(t, p, found)
 }
 
 func TestRemove(t *testing.T) {
-	ip := bnet.IPv4FromOctets(192, 168, 0, 1)
+	ip := bnet.IPv4FromOctets(192, 168, 0, 1).Ptr()
 	p := &peer{
 		addr: ip,
 	}
 
 	m := newPeerManager()
-	m.peers[ip] = p
+	m.peers[*ip] = p
 
 	m.remove(ip)
 
@@ -36,13 +36,13 @@ func TestRemove(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	ip := bnet.IPv4FromOctets(192, 168, 0, 1)
+	ip := bnet.IPv4FromOctets(192, 168, 0, 1).Ptr()
 	p := &peer{
 		addr: ip,
 	}
 
 	m := newPeerManager()
-	m.peers[ip] = p
+	m.peers[*ip] = p
 
 	found := m.get(ip)
 	assert.Exactly(t, p, found)
@@ -50,15 +50,15 @@ func TestGet(t *testing.T) {
 
 func TestList(t *testing.T) {
 	p1 := &peer{
-		addr: bnet.IPv4FromOctets(192, 168, 0, 1),
+		addr: bnet.IPv4FromOctets(192, 168, 0, 1).Ptr(),
 	}
 	p2 := &peer{
-		addr: bnet.IPv4FromOctets(192, 168, 0, 2),
+		addr: bnet.IPv4FromOctets(192, 168, 0, 2).Ptr(),
 	}
 
 	m := newPeerManager()
-	m.peers[p1.GetAddr()] = p1
-	m.peers[p2.GetAddr()] = p2
+	m.peers[*p1.GetAddr()] = p1
+	m.peers[*p2.GetAddr()] = p2
 
 	list := m.list()
 	assert.Contains(t, list, p1)

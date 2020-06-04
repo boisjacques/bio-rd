@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/bio-routing/bio-rd/net"
 	bnet "github.com/bio-routing/bio-rd/net"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,37 +13,39 @@ func TestPathNextHop(t *testing.T) {
 	tests := []struct {
 		name     string
 		p        *Path
-		expected bnet.IP
+		expected *bnet.IP
 	}{
 		{
 			name: "BGP Path",
 			p: &Path{
 				Type: BGPPathType,
 				BGPPath: &BGPPath{
-					NextHop: bnet.IPv4(123),
+					BGPPathA: &BGPPathA{
+						NextHop: bnet.IPv4(123).Ptr(),
+					},
 				},
 			},
-			expected: bnet.IPv4(123),
+			expected: bnet.IPv4(123).Ptr(),
 		},
 		{
 			name: "Static Path",
 			p: &Path{
 				Type: StaticPathType,
 				StaticPath: &StaticPath{
-					NextHop: bnet.IPv4(456),
+					NextHop: bnet.IPv4(456).Ptr(),
 				},
 			},
-			expected: bnet.IPv4(456),
+			expected: bnet.IPv4(456).Ptr(),
 		},
 		{
 			name: "Netlink Path",
 			p: &Path{
 				Type: FIBPathType,
 				FIBPath: &FIBPath{
-					NextHop: bnet.IPv4(1000),
+					NextHop: bnet.IPv4(1000).Ptr(),
 				},
 			},
-			expected: bnet.IPv4(1000),
+			expected: bnet.IPv4(1000).Ptr(),
 		},
 	}
 
@@ -126,36 +129,50 @@ func TestSelect(t *testing.T) {
 		{
 			name: "Static",
 			p: &Path{
-				Type:       StaticPathType,
-				StaticPath: &StaticPath{},
+				Type: StaticPathType,
+				StaticPath: &StaticPath{
+					NextHop: net.IPv4(0).Ptr(),
+				},
 			},
 			q: &Path{
-				Type:       StaticPathType,
-				StaticPath: &StaticPath{},
+				Type: StaticPathType,
+				StaticPath: &StaticPath{
+					NextHop: net.IPv4(0).Ptr(),
+				},
 			},
 			expected: 0,
 		},
 		{
 			name: "BGP",
 			p: &Path{
-				Type:    BGPPathType,
-				BGPPath: &BGPPath{},
+				Type: BGPPathType,
+				BGPPath: &BGPPath{
+					BGPPathA: NewBGPPathA(),
+				},
 			},
 			q: &Path{
-				Type:    BGPPathType,
-				BGPPath: &BGPPath{},
+				Type: BGPPathType,
+				BGPPath: &BGPPath{
+					BGPPathA: NewBGPPathA(),
+				},
 			},
 			expected: 0,
 		},
 		{
 			name: "Netlink",
 			p: &Path{
-				Type:    FIBPathType,
-				FIBPath: &FIBPath{},
+				Type: FIBPathType,
+				FIBPath: &FIBPath{
+					NextHop: net.IPv4(0).Ptr(),
+					Src:     net.IPv4(0).Ptr(),
+				},
 			},
 			q: &Path{
-				Type:    FIBPathType,
-				FIBPath: &FIBPath{},
+				Type: FIBPathType,
+				FIBPath: &FIBPath{
+					NextHop: net.IPv4(0).Ptr(),
+					Src:     net.IPv4(0).Ptr(),
+				},
 			},
 			expected: 0,
 		},
@@ -334,11 +351,13 @@ func TestNewNlPath(t *testing.T) {
 			source: &Path{
 				Type: BGPPathType,
 				BGPPath: &BGPPath{
-					NextHop: bnet.IPv4(123),
+					BGPPathA: &BGPPathA{
+						NextHop: bnet.IPv4(123).Ptr(),
+					},
 				},
 			},
 			expected: &FIBPath{
-				NextHop:  bnet.IPv4(123),
+				NextHop:  bnet.IPv4(123).Ptr(),
 				Protocol: ProtoBio,
 			},
 		},
@@ -371,19 +390,27 @@ func TestECMP(t *testing.T) {
 			left: &Path{
 				Type: BGPPathType,
 				BGPPath: &BGPPath{
-					LocalPref: 100,
+					BGPPathA: &BGPPathA{
+						LocalPref: 100,
+						MED:       1,
+						Origin:    123,
+						NextHop:   net.IPv4(0).Ptr(),
+						Source:    net.IPv4(0).Ptr(),
+					},
 					ASPathLen: 10,
-					MED:       1,
-					Origin:    123,
 				},
 			},
 			right: &Path{
 				Type: BGPPathType,
 				BGPPath: &BGPPath{
-					LocalPref: 100,
+					BGPPathA: &BGPPathA{
+						LocalPref: 100,
+						MED:       1,
+						Origin:    123,
+						NextHop:   net.IPv4(0).Ptr(),
+						Source:    net.IPv4(0).Ptr(),
+					},
 					ASPathLen: 10,
-					MED:       1,
-					Origin:    123,
 				},
 			},
 			ecmp: true,
@@ -392,19 +419,27 @@ func TestECMP(t *testing.T) {
 			left: &Path{
 				Type: BGPPathType,
 				BGPPath: &BGPPath{
-					LocalPref: 100,
+					BGPPathA: &BGPPathA{
+						LocalPref: 100,
+						MED:       1,
+						Origin:    123,
+						NextHop:   net.IPv4(0).Ptr(),
+						Source:    net.IPv4(0).Ptr(),
+					},
 					ASPathLen: 10,
-					MED:       1,
-					Origin:    123,
 				},
 			},
 			right: &Path{
 				Type: BGPPathType,
 				BGPPath: &BGPPath{
-					LocalPref: 100,
+					BGPPathA: &BGPPathA{
+						LocalPref: 100,
+						MED:       1,
+						Origin:    123,
+						NextHop:   net.IPv4(0).Ptr(),
+						Source:    net.IPv4(0).Ptr(),
+					},
 					ASPathLen: 5,
-					MED:       1,
-					Origin:    123,
 				},
 			},
 			ecmp: false,
@@ -414,7 +449,8 @@ func TestECMP(t *testing.T) {
 			left: &Path{
 				Type: FIBPathType,
 				FIBPath: &FIBPath{
-					Src:      bnet.IPv4(123),
+					Src:      bnet.IPv4(123).Ptr(),
+					NextHop:  bnet.IPv4(123).Ptr(),
 					Priority: 1,
 					Protocol: 1,
 					Type:     1,
@@ -424,7 +460,8 @@ func TestECMP(t *testing.T) {
 			right: &Path{
 				Type: FIBPathType,
 				FIBPath: &FIBPath{
-					Src:      bnet.IPv4(123),
+					Src:      bnet.IPv4(123).Ptr(),
+					NextHop:  bnet.IPv4(123).Ptr(),
 					Priority: 1,
 					Protocol: 1,
 					Type:     1,
@@ -432,12 +469,14 @@ func TestECMP(t *testing.T) {
 				},
 			},
 			ecmp: true,
-		}, {
+		},
+		{
 			name: "Netlink Path not ecmp",
 			left: &Path{
 				Type: FIBPathType,
 				FIBPath: &FIBPath{
-					Src:      bnet.IPv4(123),
+					Src:      bnet.IPv4(123).Ptr(),
+					NextHop:  bnet.IPv4(123).Ptr(),
 					Priority: 1,
 					Protocol: 1,
 					Type:     1,
@@ -447,7 +486,8 @@ func TestECMP(t *testing.T) {
 			right: &Path{
 				Type: FIBPathType,
 				FIBPath: &FIBPath{
-					Src:      bnet.IPv4(123),
+					Src:      bnet.IPv4(123).Ptr(),
+					NextHop:  bnet.IPv4(123).Ptr(),
 					Priority: 2,
 					Protocol: 1,
 					Type:     1,
@@ -455,18 +495,19 @@ func TestECMP(t *testing.T) {
 				},
 			},
 			ecmp: false,
-		}, {
+		},
+		{
 			name: "static Path ecmp",
 			left: &Path{
 				Type: StaticPathType,
 				StaticPath: &StaticPath{
-					NextHop: bnet.IPv4(123),
+					NextHop: bnet.IPv4(123).Ptr(),
 				},
 			},
 			right: &Path{
 				Type: StaticPathType,
 				StaticPath: &StaticPath{
-					NextHop: bnet.IPv4(123),
+					NextHop: bnet.IPv4(123).Ptr(),
 				},
 			},
 			ecmp: true,
@@ -475,13 +516,13 @@ func TestECMP(t *testing.T) {
 			left: &Path{
 				Type: StaticPathType,
 				StaticPath: &StaticPath{
-					NextHop: bnet.IPv4(123),
+					NextHop: bnet.IPv4(123).Ptr(),
 				},
 			},
 			right: &Path{
 				Type: StaticPathType,
 				StaticPath: &StaticPath{
-					NextHop: bnet.IPv4(345),
+					NextHop: bnet.IPv4(345).Ptr(),
 				},
 			},
 			// ECMP is always true for staticPath
@@ -505,15 +546,15 @@ func TestFIBPathSelect(t *testing.T) {
 		{
 			name: "equal",
 			left: &FIBPath{
-				NextHop:  bnet.IPv4(123),
-				Src:      bnet.IPv4(234),
+				NextHop:  bnet.IPv4(123).Ptr(),
+				Src:      bnet.IPv4(234).Ptr(),
 				Priority: 1,
 				Protocol: 1,
 				Table:    1,
 			},
 			right: &FIBPath{
-				NextHop:  bnet.IPv4(123),
-				Src:      bnet.IPv4(234),
+				NextHop:  bnet.IPv4(123).Ptr(),
+				Src:      bnet.IPv4(234).Ptr(),
 				Priority: 1,
 				Protocol: 1,
 				Table:    1,
@@ -523,49 +564,61 @@ func TestFIBPathSelect(t *testing.T) {
 		{
 			name: "nextHop smaller",
 			left: &FIBPath{
-				NextHop: bnet.IPv4(1),
+				NextHop: bnet.IPv4(1).Ptr(),
+				Src:     bnet.IPv4(234).Ptr(),
 			},
 			right: &FIBPath{
-				NextHop: bnet.IPv4(2),
+				NextHop: bnet.IPv4(2).Ptr(),
+				Src:     bnet.IPv4(234).Ptr(),
 			},
 			expected: -1,
 		},
 		{
 			name: "nextHop bigger",
 			left: &FIBPath{
-				NextHop: bnet.IPv4(2),
+				NextHop: bnet.IPv4(2).Ptr(),
+				Src:     bnet.IPv4(234).Ptr(),
 			},
 			right: &FIBPath{
-				NextHop: bnet.IPv4(1),
+				NextHop: bnet.IPv4(1).Ptr(),
+				Src:     bnet.IPv4(234).Ptr(),
 			},
 			expected: 1,
 		},
 		{
 			name: "src smaller",
 			left: &FIBPath{
-				Src: bnet.IPv4(1),
+				NextHop: net.IPv4(0).Ptr(),
+				Src:     bnet.IPv4(1).Ptr(),
 			},
 			right: &FIBPath{
-				Src: bnet.IPv4(2),
+				NextHop: net.IPv4(0).Ptr(),
+				Src:     bnet.IPv4(2).Ptr(),
 			},
 			expected: -1,
 		},
 		{
 			name: "src bigger",
 			left: &FIBPath{
-				Src: bnet.IPv4(2),
+				NextHop: net.IPv4(0).Ptr(),
+				Src:     bnet.IPv4(2).Ptr(),
 			},
 			right: &FIBPath{
-				Src: bnet.IPv4(1),
+				NextHop: net.IPv4(0).Ptr(),
+				Src:     bnet.IPv4(1).Ptr(),
 			},
 			expected: 1,
 		},
 		{
 			name: "priority smaller",
 			left: &FIBPath{
+				NextHop:  net.IPv4(0).Ptr(),
+				Src:      bnet.IPv4(234).Ptr(),
 				Priority: 1,
 			},
 			right: &FIBPath{
+				NextHop:  net.IPv4(0).Ptr(),
+				Src:      bnet.IPv4(234).Ptr(),
 				Priority: 2,
 			},
 			expected: -1,
@@ -573,9 +626,13 @@ func TestFIBPathSelect(t *testing.T) {
 		{
 			name: "priority bigger",
 			left: &FIBPath{
+				NextHop:  net.IPv4(0).Ptr(),
+				Src:      bnet.IPv4(234).Ptr(),
 				Priority: 2,
 			},
 			right: &FIBPath{
+				NextHop:  net.IPv4(0).Ptr(),
+				Src:      bnet.IPv4(234).Ptr(),
 				Priority: 1,
 			},
 			expected: 1,
@@ -583,9 +640,13 @@ func TestFIBPathSelect(t *testing.T) {
 		{
 			name: "protocol smaller",
 			left: &FIBPath{
+				NextHop:  net.IPv4(0).Ptr(),
+				Src:      bnet.IPv4(234).Ptr(),
 				Protocol: 1,
 			},
 			right: &FIBPath{
+				NextHop:  net.IPv4(0).Ptr(),
+				Src:      bnet.IPv4(234).Ptr(),
 				Protocol: 2,
 			},
 			expected: -1,
@@ -593,9 +654,13 @@ func TestFIBPathSelect(t *testing.T) {
 		{
 			name: "protocol bigger",
 			left: &FIBPath{
+				NextHop:  net.IPv4(0).Ptr(),
+				Src:      bnet.IPv4(234).Ptr(),
 				Protocol: 2,
 			},
 			right: &FIBPath{
+				NextHop:  net.IPv4(0).Ptr(),
+				Src:      bnet.IPv4(234).Ptr(),
 				Protocol: 1,
 			},
 			expected: 1,
@@ -603,20 +668,28 @@ func TestFIBPathSelect(t *testing.T) {
 		{
 			name: "table smaller",
 			left: &FIBPath{
-				Table: 1,
+				NextHop: net.IPv4(0).Ptr(),
+				Src:     bnet.IPv4(234).Ptr(),
+				Table:   1,
 			},
 			right: &FIBPath{
-				Table: 2,
+				NextHop: net.IPv4(0).Ptr(),
+				Src:     bnet.IPv4(234).Ptr(),
+				Table:   2,
 			},
 			expected: -1,
 		},
 		{
 			name: "table bigger",
 			left: &FIBPath{
-				Table: 2,
+				NextHop: net.IPv4(0).Ptr(),
+				Src:     bnet.IPv4(234).Ptr(),
+				Table:   2,
 			},
 			right: &FIBPath{
-				Table: 1,
+				NextHop: net.IPv4(0).Ptr(),
+				Src:     bnet.IPv4(234).Ptr(),
+				Table:   1,
 			},
 			expected: 1,
 		},

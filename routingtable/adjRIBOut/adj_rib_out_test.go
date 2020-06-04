@@ -17,14 +17,14 @@ import (
 func TestBestPathOnlyEBGP(t *testing.T) {
 	neighborBestOnlyEBGP := &routingtable.Neighbor{
 		Type:              route.BGPPathType,
-		LocalAddress:      net.IPv4FromOctets(127, 0, 0, 1),
-		Address:           net.IPv4FromOctets(127, 0, 0, 2),
+		LocalAddress:      net.IPv4FromOctets(127, 0, 0, 1).Ptr(),
+		Address:           net.IPv4FromOctets(127, 0, 0, 2).Ptr(),
 		IBGP:              false,
 		LocalASN:          41981,
 		RouteServerClient: false,
 	}
 
-	adjRIBOut := New(neighborBestOnlyEBGP, filter.NewAcceptAllFilter(), false)
+	adjRIBOut := New(nil, neighborBestOnlyEBGP, filter.NewAcceptAllFilterChain(), false)
 
 	tests := []struct {
 		name          string
@@ -36,16 +36,29 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 		{
 			name: "Add a valid route",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
-					Type:    route.BGPPathType,
-					BGPPath: &route.BGPPath{},
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
+					Type: route.BGPPathType,
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							Source: net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{},
+					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
-					BGPPath: &route.BGPPath{NextHop: neighborBestOnlyEBGP.LocalAddress,
-						ASPath: types.ASPath{
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   neighborBestOnlyEBGP.LocalAddress,
+							Origin:    0,
+							MED:       0,
+							EBGP:      false,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -54,15 +67,9 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              false,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -70,10 +77,18 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 		{
 			name: "Try to remove unpresent route",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
-					BGPPath: &route.BGPPath{NextHop: neighborBestOnlyEBGP.LocalAddress,
-						ASPath: types.ASPath{
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   neighborBestOnlyEBGP.LocalAddress,
+							Origin:    0,
+							MED:       1,
+							EBGP:      false,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -82,22 +97,26 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               1,
-						EBGP:              false,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
+						Communities:       &types.Communities{},
+						LargeCommunities:  &types.LargeCommunities{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
-					BGPPath: &route.BGPPath{NextHop: neighborBestOnlyEBGP.LocalAddress,
-						ASPath: types.ASPath{
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   neighborBestOnlyEBGP.LocalAddress,
+							Origin:    0,
+							MED:       0,
+							EBGP:      false,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -106,15 +125,9 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              false,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -122,10 +135,18 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 		{
 			name: "Remove route added in first step",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
-					BGPPath: &route.BGPPath{NextHop: neighborBestOnlyEBGP.LocalAddress,
-						ASPath: types.ASPath{
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   neighborBestOnlyEBGP.LocalAddress,
+							Origin:    0,
+							MED:       0,
+							EBGP:      false,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -134,15 +155,9 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              false,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expected:      []*route.Route{},
@@ -151,10 +166,14 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 		{
 			name: "Try to add route with NO_EXPORT community set",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						Communities: []uint32{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoExport,
 						},
 					},
@@ -165,10 +184,14 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 		{
 			name: "Try to add route with NO_ADVERTISE community set",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						Communities: []uint32{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoAdvertise,
 						},
 					},
@@ -180,16 +203,30 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 		{
 			name: "Re-add valid route again",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
-					Type:    route.BGPPathType,
-					BGPPath: &route.BGPPath{},
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
+					Type: route.BGPPathType,
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{},
+					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
-					BGPPath: &route.BGPPath{NextHop: neighborBestOnlyEBGP.LocalAddress,
-						ASPath: types.ASPath{
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   neighborBestOnlyEBGP.LocalAddress,
+							Origin:    0,
+							MED:       0,
+							EBGP:      false,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -198,15 +235,9 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              false,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -214,10 +245,18 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 		{
 			name: "Try to remove route with NO_EXPORT community set",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
-					BGPPath: &route.BGPPath{NextHop: neighborBestOnlyEBGP.LocalAddress,
-						ASPath: types.ASPath{
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   neighborBestOnlyEBGP.LocalAddress,
+							Origin:    0,
+							MED:       0,
+							EBGP:      false,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -226,24 +265,28 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 							},
 						},
 						ASPathLen: 1,
-						Origin:    0,
-						MED:       0,
-						EBGP:      false,
-						Communities: []uint32{
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoExport,
 						},
-						LargeCommunities:  []types.LargeCommunity{},
+						LargeCommunities:  &types.LargeCommunities{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
-					BGPPath: &route.BGPPath{NextHop: neighborBestOnlyEBGP.LocalAddress,
-						ASPath: types.ASPath{
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   neighborBestOnlyEBGP.LocalAddress,
+							Origin:    0,
+							MED:       0,
+							EBGP:      false,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -252,15 +295,9 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              false,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -268,16 +305,29 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 		{
 			name: "Try to remove non-existent prefix",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 23, 42, 0), 24), &route.Path{
-					Type:    route.BGPPathType,
-					BGPPath: &route.BGPPath{},
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 23, 42, 0), 24).Ptr(), &route.Path{
+					Type: route.BGPPathType,
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop: net.IPv4(0).Ptr(),
+							Source:  net.IPv4(0).Ptr(),
+						},
+					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
-					BGPPath: &route.BGPPath{NextHop: neighborBestOnlyEBGP.LocalAddress,
-						ASPath: types.ASPath{
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   neighborBestOnlyEBGP.LocalAddress,
+							Origin:    0,
+							MED:       0,
+							EBGP:      false,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -286,15 +336,9 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              false,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -304,11 +348,11 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 	for i, test := range tests {
 		fmt.Printf("Running eBGP best only test #%d: %s\n", i+1, test.name)
 		for _, route := range test.routesAdd {
-			adjRIBOut.AddPath(route.Prefix(), route.Paths()[0])
+			adjRIBOut.AddPath(route.Prefix().Ptr(), route.Paths()[0])
 		}
 
 		for _, route := range test.routesRemove {
-			adjRIBOut.RemovePath(route.Prefix(), route.Paths()[0])
+			adjRIBOut.RemovePath(route.Prefix().Ptr(), route.Paths()[0])
 		}
 
 		assert.Equal(t, test.expected, adjRIBOut.rt.Dump())
@@ -323,14 +367,14 @@ func TestBestPathOnlyEBGP(t *testing.T) {
 func TestBestPathOnlyIBGP(t *testing.T) {
 	neighborBestOnlyEBGP := &routingtable.Neighbor{
 		Type:              route.BGPPathType,
-		LocalAddress:      net.IPv4FromOctets(127, 0, 0, 1),
-		Address:           net.IPv4FromOctets(127, 0, 0, 2),
+		LocalAddress:      net.IPv4FromOctets(127, 0, 0, 1).Ptr(),
+		Address:           net.IPv4FromOctets(127, 0, 0, 2).Ptr(),
 		IBGP:              true,
 		LocalASN:          41981,
 		RouteServerClient: false,
 	}
 
-	adjRIBOut := New(neighborBestOnlyEBGP, filter.NewAcceptAllFilter(), false)
+	adjRIBOut := New(nil, neighborBestOnlyEBGP, filter.NewAcceptAllFilterChain(), false)
 
 	testSteps := []struct {
 		name          string
@@ -342,9 +386,14 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 		{
 			name: "Add an iBGP route (without success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
-					Type:    route.BGPPathType,
-					BGPPath: &route.BGPPath{},
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
+					Type: route.BGPPathType,
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+					},
 				}),
 			},
 			expected:      []*route.Route{},
@@ -353,11 +402,15 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 		{
 			name: "Add an eBGP route (with success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						EBGP: true,
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							NextHop: net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Source:  net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -366,16 +419,22 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen: 1,
-						NextHop:   net.IPv4FromOctets(1, 2, 3, 4),
 					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       0,
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -384,15 +443,9 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -400,11 +453,18 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 		{
 			name: "Try to remove slightly different route",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       1,
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -413,23 +473,26 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               1,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
+						Communities:       &types.Communities{},
+						LargeCommunities:  &types.LargeCommunities{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       0,
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -438,15 +501,9 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -454,11 +511,15 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 		{
 			name: "Remove route added in 2nd step",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							NextHop: net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Source:  net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -466,16 +527,8 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 								},
 							},
 						},
-						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
-						UnknownAttributes: nil,
-						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+						ASPathLen: 1,
+					},
 				}),
 			},
 			expected:      []*route.Route{},
@@ -484,10 +537,14 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 		{
 			name: "Try to add route with NO_EXPORT community set (without success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						Communities: []uint32{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoExport,
 						},
 					},
@@ -498,10 +555,14 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 		{
 			name: "Try to add route with NO_ADVERTISE community set (without success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						Communities: []uint32{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoAdvertise,
 						},
 					},
@@ -514,11 +575,11 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 	for i, test := range testSteps {
 		fmt.Printf("Running iBGP best only test #%d: %s\n", i+1, test.name)
 		for _, route := range test.routesAdd {
-			adjRIBOut.AddPath(route.Prefix(), route.Paths()[0])
+			adjRIBOut.AddPath(route.Prefix().Ptr(), route.Paths()[0])
 		}
 
 		for _, route := range test.routesRemove {
-			adjRIBOut.RemovePath(route.Prefix(), route.Paths()[0])
+			adjRIBOut.RemovePath(route.Prefix().Ptr(), route.Paths()[0])
 		}
 
 		assert.Equal(t, test.expected, adjRIBOut.rt.Dump())
@@ -537,16 +598,16 @@ func TestBestPathOnlyIBGP(t *testing.T) {
 func TestBestPathOnlyRRClient(t *testing.T) {
 	neighborBestOnlyRR := &routingtable.Neighbor{
 		Type:                 route.BGPPathType,
-		LocalAddress:         net.IPv4FromOctets(127, 0, 0, 1),
-		Address:              net.IPv4FromOctets(127, 0, 0, 2),
+		LocalAddress:         net.IPv4FromOctets(127, 0, 0, 1).Ptr(),
+		Address:              net.IPv4FromOctets(127, 0, 0, 2).Ptr(),
 		IBGP:                 true,
 		LocalASN:             41981,
 		RouteServerClient:    false,
 		RouteReflectorClient: true,
-		ClusterID:            net.IPv4FromOctets(2, 2, 2, 2).ToUint32(),
+		ClusterID:            net.IPv4FromOctets(2, 2, 2, 2).Ptr().ToUint32(),
 	}
 
-	adjRIBOut := New(neighborBestOnlyRR, filter.NewAcceptAllFilter(), false)
+	adjRIBOut := New(nil, neighborBestOnlyRR, filter.NewAcceptAllFilterChain(), false)
 
 	tests := []struct {
 		name          string
@@ -558,19 +619,27 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 		{
 			name: "Add an iBGP route (with success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
-					Type:    route.BGPPathType,
-					BGPPath: &route.BGPPath{},
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
+					Type: route.BGPPathType,
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{},
+					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						Communities:      []uint32{},
-						LargeCommunities: []types.LargeCommunity{},
-						ASPath:           types.ASPath{},
-						ClusterList: []uint32{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{},
+						ClusterList: &types.ClusterList{
 							neighborBestOnlyRR.ClusterID,
 						},
 					},
@@ -581,11 +650,15 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 		{
 			name: "Add an eBGP route (replacing previous iBGP route)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						EBGP: true,
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							NextHop: net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Source:  net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -594,16 +667,22 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 							},
 						},
 						ASPathLen: 1,
-						NextHop:   net.IPv4FromOctets(1, 2, 3, 4),
 					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       0,
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -612,16 +691,9 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{},
-						ClusterList: []uint32{
+						ClusterList: &types.ClusterList{
 							neighborBestOnlyRR.ClusterID,
 						},
 					},
@@ -632,11 +704,18 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 		{
 			name: "Try to remove slightly different route",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       1, // Existing route has MED 0
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -645,23 +724,26 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               1, // Existing route has MED 0
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
+						Communities:       &types.Communities{},
+						LargeCommunities:  &types.LargeCommunities{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       0,
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -670,16 +752,9 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{},
-						ClusterList: []uint32{
+						ClusterList: &types.ClusterList{
 							neighborBestOnlyRR.ClusterID,
 						},
 					},
@@ -690,11 +765,18 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 		{
 			name: "Remove route added in 2nd step",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       0,
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -703,16 +785,9 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{},
-						ClusterList: []uint32{
+						ClusterList: &types.ClusterList{
 							neighborBestOnlyRR.ClusterID,
 						},
 					},
@@ -724,10 +799,14 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 		{
 			name: "Try to add route with NO_ADVERTISE community set (without success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						Communities: []uint32{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoAdvertise,
 						},
 					},
@@ -739,33 +818,37 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 		{
 			name: "Try to add route with NO_EXPORT community set (with success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						Communities: []uint32{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoExport,
 						},
 					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						ASPath:    types.ASPath{},
+						BGPPathA: &route.BGPPathA{
+							Origin:    0,
+							MED:       0,
+							EBGP:      false,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 						ASPathLen: 0,
-						Origin:    0,
-						MED:       0,
-						EBGP:      false,
-						Communities: []uint32{
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoExport,
 						},
-						LargeCommunities:  []types.LargeCommunity{},
-						UnknownAttributes: nil,
-						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{},
-						ClusterList: []uint32{
+						PathIdentifier: 0,
+						ClusterList: &types.ClusterList{
 							neighborBestOnlyRR.ClusterID,
 						},
 					},
@@ -776,23 +859,23 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 		{
 			name: "Remove NO_EXPORT route added before",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						ASPath:    types.ASPath{},
+						BGPPathA: &route.BGPPathA{
+							Origin:    0,
+							MED:       0,
+							EBGP:      false,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+							NextHop:   net.IPv4(0).Ptr(),
+						},
 						ASPathLen: 0,
-						Origin:    0,
-						MED:       0,
-						EBGP:      false,
-						Communities: []uint32{
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoExport,
 						},
-						LargeCommunities:  []types.LargeCommunity{},
-						UnknownAttributes: nil,
-						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{},
-						ClusterList: []uint32{
+						PathIdentifier: 0,
+						ClusterList: &types.ClusterList{
 							neighborBestOnlyRR.ClusterID,
 						},
 					},
@@ -804,36 +887,40 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 		{
 			name: "Add route with one entry in ClusterList and OriginatorID set (with success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						OriginatorID: 42,
-						ClusterList: []uint32{
+						BGPPathA: &route.BGPPathA{
+							OriginatorID: 42,
+							Source:       net.IPv4(0).Ptr(),
+							NextHop:      net.IPv4(0).Ptr(),
+						},
+						ClusterList: &types.ClusterList{
 							23,
 						},
 					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						ASPath:            types.ASPath{},
-						ASPathLen:         0,
-						Origin:            0,
-						MED:               0,
-						EBGP:              false,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
+						ASPathLen: 0,
+						BGPPathA: &route.BGPPathA{
+							Origin:       0,
+							MED:          0,
+							EBGP:         false,
+							LocalPref:    0,
+							Source:       net.IPv4(0).Ptr(),
+							OriginatorID: 42,
+							NextHop:      net.IPv4(0).Ptr(),
+						},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{},
-						ClusterList: []uint32{
+						ClusterList: &types.ClusterList{
 							neighborBestOnlyRR.ClusterID,
 							23,
 						},
-						OriginatorID: 42,
 					},
 				}),
 			},
@@ -844,11 +931,11 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 	for i, test := range tests {
 		fmt.Printf("Running RR client best only test #%d: %s\n", i+1, test.name)
 		for _, route := range test.routesAdd {
-			adjRIBOut.AddPath(route.Prefix(), route.Paths()[0])
+			adjRIBOut.AddPath(route.Prefix().Ptr(), route.Paths()[0])
 		}
 
 		for _, route := range test.routesRemove {
-			adjRIBOut.RemovePath(route.Prefix(), route.Paths()[0])
+			adjRIBOut.RemovePath(route.Prefix().Ptr(), route.Paths()[0])
 		}
 
 		assert.Equal(t, test.expected, adjRIBOut.rt.Dump())
@@ -867,14 +954,14 @@ func TestBestPathOnlyRRClient(t *testing.T) {
 func TestAddPathIBGP(t *testing.T) {
 	neighborBestOnlyEBGP := &routingtable.Neighbor{
 		Type:              route.BGPPathType,
-		LocalAddress:      net.IPv4FromOctets(127, 0, 0, 1),
-		Address:           net.IPv4FromOctets(127, 0, 0, 2),
+		LocalAddress:      net.IPv4FromOctets(127, 0, 0, 1).Ptr(),
+		Address:           net.IPv4FromOctets(127, 0, 0, 2).Ptr(),
 		IBGP:              true,
 		LocalASN:          41981,
 		RouteServerClient: false,
 	}
 
-	adjRIBOut := New(neighborBestOnlyEBGP, filter.NewAcceptAllFilter(), true)
+	adjRIBOut := New(nil, neighborBestOnlyEBGP, filter.NewAcceptAllFilterChain(), true)
 
 	tests := []struct {
 		name          string
@@ -886,9 +973,14 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Add an iBGP route (without success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
-					Type:    route.BGPPathType,
-					BGPPath: &route.BGPPath{},
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
+					Type: route.BGPPathType,
+					BGPPath: &route.BGPPath{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4(0).Ptr(),
+						},
+					},
 				}),
 			},
 			expected:      []*route.Route{},
@@ -897,11 +989,15 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Add an eBGP route (with success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						EBGP: true,
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -910,16 +1006,22 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen: 1,
-						NextHop:   net.IPv4FromOctets(1, 2, 3, 4),
 					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       0,
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -928,15 +1030,9 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    1,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -944,11 +1040,18 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Try to remove slightly different route",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       1, // MED of route present in table is 0
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -957,23 +1060,26 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               1, // MED of route present in table is 0
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
+						Communities:       &types.Communities{},
+						LargeCommunities:  &types.LargeCommunities{},
 						UnknownAttributes: nil,
 						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       0,
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -982,15 +1088,9 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    1,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -998,11 +1098,15 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Remove route added in 2nd step",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -1010,16 +1114,8 @@ func TestAddPathIBGP(t *testing.T) {
 								},
 							},
 						},
-						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
-						UnknownAttributes: nil,
-						PathIdentifier:    0, // We calculate PathID in RIBOut so none is present when removing from RIBOut
-						LocalPref:         0,
-						Source:            net.IP{}},
+						ASPathLen: 1,
+					},
 				}),
 			},
 			expected:      []*route.Route{},
@@ -1028,10 +1124,14 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Try to add route with NO_EXPORT community set (without success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						Communities: []uint32{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+						},
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoExport,
 						},
 					},
@@ -1043,10 +1143,14 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Try to add route with NO_EXPORT community set (without success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						Communities: []uint32{
+						BGPPathA: &route.BGPPathA{
+							Source:  net.IPv4(0).Ptr(),
+							NextHop: net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+						},
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoAdvertise,
 						},
 					},
@@ -1060,11 +1164,15 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Readd an eBGP route (with success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						EBGP: true,
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							NextHop: net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Source:  net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -1073,16 +1181,22 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen: 1,
-						NextHop:   net.IPv4FromOctets(1, 2, 3, 4),
 					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       0,
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -1091,15 +1205,9 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    2,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -1107,11 +1215,15 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Add 2nd path to existing one with different NH (with success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						EBGP: true,
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							NextHop: net.IPv4FromOctets(2, 3, 4, 5).Ptr(),
+							Source:  net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -1120,17 +1232,23 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen: 1,
-						NextHop:   net.IPv4FromOctets(2, 3, 4, 5),
 					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRouteAddPath(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), []*route.Path{
+				route.NewRouteAddPath(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), []*route.Path{
 					{
 						Type: route.BGPPathType,
 						BGPPath: &route.BGPPath{
-							NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-							ASPath: types.ASPath{
+							BGPPathA: &route.BGPPathA{
+								NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+								Origin:    0,
+								MED:       0,
+								EBGP:      true,
+								LocalPref: 0,
+								Source:    net.IPv4(0).Ptr(),
+							},
+							ASPath: &types.ASPath{
 								types.ASPathSegment{
 									Type: types.ASSequence,
 									ASNs: []uint32{
@@ -1139,21 +1257,22 @@ func TestAddPathIBGP(t *testing.T) {
 								},
 							},
 							ASPathLen:         1,
-							Origin:            0,
-							MED:               0,
-							EBGP:              true,
-							Communities:       []uint32{},
-							LargeCommunities:  []types.LargeCommunity{},
 							UnknownAttributes: nil,
 							PathIdentifier:    2,
-							LocalPref:         0,
-							Source:            net.IP{}},
+						},
 					},
 					{
 						Type: route.BGPPathType,
 						BGPPath: &route.BGPPath{
-							NextHop: net.IPv4FromOctets(2, 3, 4, 5),
-							ASPath: types.ASPath{
+							BGPPathA: &route.BGPPathA{
+								NextHop:   net.IPv4FromOctets(2, 3, 4, 5).Ptr(),
+								Origin:    0,
+								MED:       0,
+								EBGP:      true,
+								LocalPref: 0,
+								Source:    net.IPv4(0).Ptr(),
+							},
+							ASPath: &types.ASPath{
 								types.ASPathSegment{
 									Type: types.ASSequence,
 									ASNs: []uint32{
@@ -1162,15 +1281,9 @@ func TestAddPathIBGP(t *testing.T) {
 								},
 							},
 							ASPathLen:         1,
-							Origin:            0,
-							MED:               0,
-							EBGP:              true,
-							Communities:       []uint32{},
-							LargeCommunities:  []types.LargeCommunity{},
 							UnknownAttributes: nil,
 							PathIdentifier:    3,
-							LocalPref:         0,
-							Source:            net.IP{}},
+						},
 					}}),
 			},
 			expectedCount: 1,
@@ -1178,11 +1291,15 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Remove 2nd path added above",
 			routesRemove: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(2, 3, 4, 5),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							NextHop: net.IPv4FromOctets(2, 3, 4, 5).Ptr(),
+							Source:  net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -1190,24 +1307,23 @@ func TestAddPathIBGP(t *testing.T) {
 								},
 							},
 						},
-						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
-						UnknownAttributes: nil,
-						PathIdentifier:    0,
-						LocalPref:         0,
-						Source:            net.IP{}},
+						ASPathLen: 1,
+					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+							Origin:    0,
+							MED:       0,
+							EBGP:      true,
+							LocalPref: 0,
+							Source:    net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -1216,15 +1332,9 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen:         1,
-						Origin:            0,
-						MED:               0,
-						EBGP:              true,
-						Communities:       []uint32{},
-						LargeCommunities:  []types.LargeCommunity{},
 						UnknownAttributes: nil,
 						PathIdentifier:    2,
-						LocalPref:         0,
-						Source:            net.IP{}},
+					},
 				}),
 			},
 			expectedCount: 1,
@@ -1232,11 +1342,15 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Re-add 2nd path to existing one with different NH (with success)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						EBGP: true,
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							NextHop: net.IPv4FromOctets(3, 4, 5, 6).Ptr(),
+							Source:  net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -1245,17 +1359,23 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen: 1,
-						NextHop:   net.IPv4FromOctets(3, 4, 5, 6),
 					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRouteAddPath(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), []*route.Path{
+				route.NewRouteAddPath(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), []*route.Path{
 					{
 						Type: route.BGPPathType,
 						BGPPath: &route.BGPPath{
-							NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-							ASPath: types.ASPath{
+							BGPPathA: &route.BGPPathA{
+								NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+								Origin:    0,
+								MED:       0,
+								EBGP:      true,
+								LocalPref: 0,
+								Source:    net.IPv4(0).Ptr(),
+							},
+							ASPath: &types.ASPath{
 								types.ASPathSegment{
 									Type: types.ASSequence,
 									ASNs: []uint32{
@@ -1264,21 +1384,22 @@ func TestAddPathIBGP(t *testing.T) {
 								},
 							},
 							ASPathLen:         1,
-							Origin:            0,
-							MED:               0,
-							EBGP:              true,
-							Communities:       []uint32{},
-							LargeCommunities:  []types.LargeCommunity{},
 							UnknownAttributes: nil,
 							PathIdentifier:    2,
-							LocalPref:         0,
-							Source:            net.IP{}},
+						},
 					},
 					{
 						Type: route.BGPPathType,
 						BGPPath: &route.BGPPath{
-							NextHop: net.IPv4FromOctets(3, 4, 5, 6),
-							ASPath: types.ASPath{
+							BGPPathA: &route.BGPPathA{
+								NextHop:   net.IPv4FromOctets(3, 4, 5, 6).Ptr(),
+								Origin:    0,
+								MED:       0,
+								EBGP:      true,
+								LocalPref: 0,
+								Source:    net.IPv4(0).Ptr(),
+							},
+							ASPath: &types.ASPath{
 								types.ASPathSegment{
 									Type: types.ASSequence,
 									ASNs: []uint32{
@@ -1287,15 +1408,9 @@ func TestAddPathIBGP(t *testing.T) {
 								},
 							},
 							ASPathLen:         1,
-							Origin:            0,
-							MED:               0,
-							EBGP:              true,
-							Communities:       []uint32{},
-							LargeCommunities:  []types.LargeCommunity{},
 							UnknownAttributes: nil,
 							PathIdentifier:    4,
-							LocalPref:         0,
-							Source:            net.IP{}},
+						},
 					}}),
 			},
 			expectedCount: 1,
@@ -1303,11 +1418,15 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Add 3rd path to existing ones, containing NO_EXPORT community (successful)",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						EBGP: true,
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							NextHop: net.IPv4FromOctets(4, 5, 6, 7).Ptr(),
+							Source:  net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -1316,20 +1435,26 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen: 1,
-						NextHop:   net.IPv4FromOctets(4, 5, 6, 7),
-						Communities: []uint32{
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoExport,
 						},
 					},
 				}),
 			},
 			expected: []*route.Route{
-				route.NewRouteAddPath(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), []*route.Path{
+				route.NewRouteAddPath(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), []*route.Path{
 					{
 						Type: route.BGPPathType,
 						BGPPath: &route.BGPPath{
-							NextHop: net.IPv4FromOctets(1, 2, 3, 4),
-							ASPath: types.ASPath{
+							BGPPathA: &route.BGPPathA{
+								NextHop:   net.IPv4FromOctets(1, 2, 3, 4).Ptr(),
+								Origin:    0,
+								MED:       0,
+								EBGP:      true,
+								LocalPref: 0,
+								Source:    net.IPv4(0).Ptr(),
+							},
+							ASPath: &types.ASPath{
 								types.ASPathSegment{
 									Type: types.ASSequence,
 									ASNs: []uint32{
@@ -1338,21 +1463,22 @@ func TestAddPathIBGP(t *testing.T) {
 								},
 							},
 							ASPathLen:         1,
-							Origin:            0,
-							MED:               0,
-							EBGP:              true,
-							Communities:       []uint32{},
-							LargeCommunities:  []types.LargeCommunity{},
 							UnknownAttributes: nil,
 							PathIdentifier:    2,
-							LocalPref:         0,
-							Source:            net.IP{}},
+						},
 					},
 					{
 						Type: route.BGPPathType,
 						BGPPath: &route.BGPPath{
-							NextHop: net.IPv4FromOctets(3, 4, 5, 6),
-							ASPath: types.ASPath{
+							BGPPathA: &route.BGPPathA{
+								NextHop:   net.IPv4FromOctets(3, 4, 5, 6).Ptr(),
+								Origin:    0,
+								MED:       0,
+								EBGP:      true,
+								LocalPref: 0,
+								Source:    net.IPv4(0).Ptr(),
+							},
+							ASPath: &types.ASPath{
 								types.ASPathSegment{
 									Type: types.ASSequence,
 									ASNs: []uint32{
@@ -1361,21 +1487,22 @@ func TestAddPathIBGP(t *testing.T) {
 								},
 							},
 							ASPathLen:         1,
-							Origin:            0,
-							MED:               0,
-							EBGP:              true,
-							Communities:       []uint32{},
-							LargeCommunities:  []types.LargeCommunity{},
 							UnknownAttributes: nil,
 							PathIdentifier:    4,
-							LocalPref:         0,
-							Source:            net.IP{}},
+						},
 					},
 					{
 						Type: route.BGPPathType,
 						BGPPath: &route.BGPPath{
-							NextHop: net.IPv4FromOctets(4, 5, 6, 7),
-							ASPath: types.ASPath{
+							BGPPathA: &route.BGPPathA{
+								NextHop:   net.IPv4FromOctets(4, 5, 6, 7).Ptr(),
+								Origin:    0,
+								MED:       0,
+								EBGP:      true,
+								LocalPref: 0,
+								Source:    net.IPv4(0).Ptr(),
+							},
+							ASPath: &types.ASPath{
 								types.ASPathSegment{
 									Type: types.ASSequence,
 									ASNs: []uint32{
@@ -1384,17 +1511,12 @@ func TestAddPathIBGP(t *testing.T) {
 								},
 							},
 							ASPathLen: 1,
-							Origin:    0,
-							MED:       0,
-							EBGP:      true,
-							Communities: []uint32{
+							Communities: &types.Communities{
 								types.WellKnownCommunityNoExport,
 							},
-							LargeCommunities:  []types.LargeCommunity{},
 							UnknownAttributes: nil,
 							PathIdentifier:    5,
-							LocalPref:         0,
-							Source:            net.IP{}},
+						},
 					},
 				}),
 			},
@@ -1403,11 +1525,15 @@ func TestAddPathIBGP(t *testing.T) {
 		{
 			name: "Add 4th path to existing ones, containing NO_ADVERTISE community",
 			routesAdd: []*route.Route{
-				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+				route.NewRoute(net.NewPfx(net.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						EBGP: true,
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							EBGP:    true,
+							NextHop: net.IPv4FromOctets(5, 6, 7, 8).Ptr(),
+							Source:  net.IPv4(0).Ptr(),
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{
@@ -1416,8 +1542,7 @@ func TestAddPathIBGP(t *testing.T) {
 							},
 						},
 						ASPathLen: 1,
-						NextHop:   net.IPv4FromOctets(5, 6, 7, 8),
-						Communities: []uint32{
+						Communities: &types.Communities{
 							types.WellKnownCommunityNoAdvertise,
 						},
 					},
@@ -1431,11 +1556,11 @@ func TestAddPathIBGP(t *testing.T) {
 	for i, test := range tests {
 		fmt.Printf("Running iBGP AddPath test #%d: %s\n", i+1, test.name)
 		for _, route := range test.routesAdd {
-			adjRIBOut.AddPath(route.Prefix(), route.Paths()[0])
+			adjRIBOut.AddPath(route.Prefix().Ptr(), route.Paths()[0])
 		}
 
 		for _, route := range test.routesRemove {
-			adjRIBOut.RemovePath(route.Prefix(), route.Paths()[0])
+			adjRIBOut.RemovePath(route.Prefix().Ptr(), route.Paths()[0])
 		}
 
 		if !assert.Equalf(t, test.expected, adjRIBOut.rt.Dump(), "Test %q", test.name) {

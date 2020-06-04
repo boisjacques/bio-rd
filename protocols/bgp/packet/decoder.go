@@ -10,6 +10,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	addPathTupleSize = 4
+)
+
 // Decode decodes a BGP message
 func Decode(buf *bytes.Buffer, opt *DecodeOptions) (*BGPMessage, error) {
 	hdr, err := decodeHeader(buf)
@@ -45,17 +49,17 @@ func decodeMsgBody(buf *bytes.Buffer, msgType uint8, l uint16, opt *DecodeOption
 func decodeUpdateMsg(buf *bytes.Buffer, l uint16, opt *DecodeOptions) (*BGPUpdate, error) {
 	msg := &BGPUpdate{}
 
-	err := decode.Decode(buf, []interface{}{&msg.WithdrawnRoutesLen})
+	err := decode.DecodeUint16(buf, &msg.WithdrawnRoutesLen)
 	if err != nil {
 		return msg, err
 	}
 
-	msg.WithdrawnRoutes, err = decodeNLRIs(buf, uint16(msg.WithdrawnRoutesLen), IPv4AFI, opt.AddPath)
+	msg.WithdrawnRoutes, err = decodeNLRIs(buf, uint16(msg.WithdrawnRoutesLen), IPv4AFI, opt.AddPathIPv4Unicast)
 	if err != nil {
 		return msg, err
 	}
 
-	err = decode.Decode(buf, []interface{}{&msg.TotalPathAttrLen})
+	err = decode.DecodeUint16(buf, &msg.TotalPathAttrLen)
 	if err != nil {
 		return msg, err
 	}
@@ -67,7 +71,7 @@ func decodeUpdateMsg(buf *bytes.Buffer, l uint16, opt *DecodeOptions) (*BGPUpdat
 
 	nlriLen := uint16(l) - 4 - uint16(msg.TotalPathAttrLen) - uint16(msg.WithdrawnRoutesLen)
 	if nlriLen > 0 {
-		msg.NLRI, err = decodeNLRIs(buf, nlriLen, IPv4AFI, opt.AddPath)
+		msg.NLRI, err = decodeNLRIs(buf, nlriLen, IPv4AFI, opt.AddPathIPv4Unicast)
 		if err != nil {
 			return msg, err
 		}
@@ -115,7 +119,8 @@ func decodeNotificationMsg(buf *bytes.Buffer) (*BGPNotification, error) {
 			return invalidErrCode(msg)
 		}
 	case Cease:
-		if !(msg.ErrorSubcode == 0 || msg.ErrorSubcode == AdministrativeShutdown || msg.ErrorSubcode == AdministrativeReset) {
+		// accept 0 or all error subcodes specified in RFC4486 (1 - 8)
+		if msg.ErrorSubcode > OutOfResources {
 			return invalidErrCode(msg)
 		}
 	default:
@@ -241,7 +246,7 @@ func decodeCapability(buf *bytes.Buffer) (Capability, error) {
 		}
 		cap.Value = mpCap
 	case AddPathCapabilityCode:
-		addPathCap, err := decodeAddPathCapability(buf)
+		addPathCap, err := decodeAddPathCapability(buf, cap.Length)
 		if err != nil {
 			return cap, errors.Wrap(err, "Unable to decode add path capability")
 		}
@@ -279,20 +284,29 @@ func decodeMultiProtocolCapability(buf *bytes.Buffer) (MultiProtocolCapability, 
 	return mpCap, nil
 }
 
-func decodeAddPathCapability(buf *bytes.Buffer) (AddPathCapability, error) {
-	addPathCap := AddPathCapability{}
-	fields := []interface{}{
-		&addPathCap.AFI,
-		&addPathCap.SAFI,
-		&addPathCap.SendReceive,
+func decodeAddPathCapability(buf *bytes.Buffer, capLength uint8) (AddPathCapability, error) {
+	addPathCaps := make(AddPathCapability, 0)
+
+	if capLength%addPathTupleSize != 0 {
+		return nil, fmt.Errorf("Invalid caplength %d, must be multiple of %d", capLength, addPathTupleSize)
 	}
 
-	err := decode.Decode(buf, fields)
-	if err != nil {
-		return addPathCap, err
+	for ; capLength >= addPathTupleSize; capLength -= addPathTupleSize {
+		addPathCap := AddPathCapabilityTuple{}
+		fields := []interface{}{
+			&addPathCap.AFI,
+			&addPathCap.SAFI,
+			&addPathCap.SendReceive,
+		}
+		err := decode.Decode(buf, fields)
+		if err != nil {
+			return nil, err
+		}
+
+		addPathCaps = append(addPathCaps, addPathCap)
 	}
 
-	return addPathCap, nil
+	return addPathCaps, nil
 }
 
 func decodeASN4Capability(buf *bytes.Buffer) (ASN4Capability, error) {
@@ -352,40 +366,35 @@ func isValidIdentifier(id uint32) bool {
 func decodeHeader(buf *bytes.Buffer) (*BGPHeader, error) {
 	hdr := &BGPHeader{}
 
-	marker := make([]byte, MarkerLen)
-	n, err := buf.Read(marker)
-	if err != nil {
-		return hdr, BGPError{
-			ErrorCode:    Cease,
-			ErrorSubCode: 0,
-			ErrorStr:     fmt.Sprintf("Failed to read from buffer: %v", err.Error()),
+	for i := 0; i < MarkerLen; i++ {
+		b, err := buf.ReadByte()
+		if err != nil {
+			return hdr, BGPError{
+				ErrorCode:    Cease,
+				ErrorSubCode: 0,
+				ErrorStr:     fmt.Sprintf("Failed to read from buffer: %v", err),
+			}
 		}
-	}
 
-	if n != MarkerLen {
-		return hdr, BGPError{
-			ErrorCode:    Cease,
-			ErrorSubCode: 0,
-			ErrorStr:     fmt.Sprintf("Unable to read marker"),
-		}
-	}
-
-	for i := range marker {
-		if marker[i] != 255 {
+		if b != 0xff {
 			return nil, BGPError{
 				ErrorCode:    MessageHeaderError,
 				ErrorSubCode: ConnectionNotSync,
-				ErrorStr:     fmt.Sprintf("Invalid marker: %v", marker),
+				ErrorStr:     fmt.Sprintf("Invalid marker"),
 			}
 		}
 	}
 
-	fields := []interface{}{
-		&hdr.Length,
-		&hdr.Type,
+	err := decode.DecodeUint16(buf, &hdr.Length)
+	if err != nil {
+		return hdr, BGPError{
+			ErrorCode:    Cease,
+			ErrorSubCode: 0,
+			ErrorStr:     fmt.Sprintf("%v", err.Error()),
+		}
 	}
 
-	err = decode.Decode(buf, fields)
+	err = decode.DecodeUint8(buf, &hdr.Type)
 	if err != nil {
 		return hdr, BGPError{
 			ErrorCode:    Cease,

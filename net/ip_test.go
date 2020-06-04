@@ -12,12 +12,12 @@ import (
 func TestLower(t *testing.T) {
 	tests := []struct {
 		name     string
-		ip       IP
+		ip       *IP
 		expected uint64
 	}{
 		{
 			name:     "Test",
-			ip:       IP{lower: 100},
+			ip:       &IP{lower: 100},
 			expected: 100,
 		},
 	}
@@ -31,12 +31,12 @@ func TestLower(t *testing.T) {
 func TestHigher(t *testing.T) {
 	tests := []struct {
 		name     string
-		ip       IP
+		ip       *IP
 		expected uint64
 	}{
 		{
 			name:     "Test",
-			ip:       IP{higher: 200},
+			ip:       &IP{higher: 200},
 			expected: 200,
 		},
 	}
@@ -72,12 +72,12 @@ func TestIPVersion(t *testing.T) {
 func TestIPToProto(t *testing.T) {
 	tests := []struct {
 		name     string
-		ip       IP
+		ip       *IP
 		expected *api.IP
 	}{
 		{
 			name: "IPv4",
-			ip: IP{
+			ip: &IP{
 				lower:    255,
 				isLegacy: true,
 			},
@@ -88,7 +88,7 @@ func TestIPToProto(t *testing.T) {
 		},
 		{
 			name: "IPv6",
-			ip: IP{
+			ip: &IP{
 				higher:   1000,
 				lower:    255,
 				isLegacy: false,
@@ -111,7 +111,7 @@ func TestIPFromProtoIP(t *testing.T) {
 	tests := []struct {
 		name     string
 		proto    api.IP
-		expected IP
+		expected *IP
 	}{
 		{
 			name: "Test IPv4",
@@ -120,7 +120,7 @@ func TestIPFromProtoIP(t *testing.T) {
 				Higher:  0,
 				Version: api.IP_IPv4,
 			},
-			expected: IP{
+			expected: &IP{
 				lower:    100,
 				higher:   0,
 				isLegacy: true,
@@ -133,7 +133,7 @@ func TestIPFromProtoIP(t *testing.T) {
 				Higher:  200,
 				Version: api.IP_IPv6,
 			},
-			expected: IP{
+			expected: &IP{
 				lower:    100,
 				higher:   200,
 				isLegacy: false,
@@ -141,26 +141,26 @@ func TestIPFromProtoIP(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		res := IPFromProtoIP(test.proto)
-		assert.Equal(t, test.expected, res, test.name)
+	for i := range tests {
+		res := IPFromProtoIP(&tests[i].proto)
+		assert.Equal(t, tests[i].expected, res, tests[i].name)
 	}
 }
 
 func TestCompare(t *testing.T) {
 	tests := []struct {
 		name     string
-		ip       IP
-		other    IP
+		ip       *IP
+		other    *IP
 		expected int8
 	}{
 		{
 			name: "equal",
-			ip: IP{
+			ip: &IP{
 				lower:  100,
 				higher: 200,
 			},
-			other: IP{
+			other: &IP{
 				lower:  100,
 				higher: 200,
 			},
@@ -168,11 +168,11 @@ func TestCompare(t *testing.T) {
 		},
 		{
 			name: "greater higher word",
-			ip: IP{
+			ip: &IP{
 				lower:  123,
 				higher: 200,
 			},
-			other: IP{
+			other: &IP{
 				lower:  456,
 				higher: 100,
 			},
@@ -180,11 +180,11 @@ func TestCompare(t *testing.T) {
 		},
 		{
 			name: "lesser higher word",
-			ip: IP{
+			ip: &IP{
 				lower:  123,
 				higher: 100,
 			},
-			other: IP{
+			other: &IP{
 				lower:  456,
 				higher: 200,
 			},
@@ -192,11 +192,11 @@ func TestCompare(t *testing.T) {
 		},
 		{
 			name: "equal higher word but lesser lower word",
-			ip: IP{
+			ip: &IP{
 				lower:  456,
 				higher: 100,
 			},
-			other: IP{
+			other: &IP{
 				lower:  123,
 				higher: 100,
 			},
@@ -204,11 +204,11 @@ func TestCompare(t *testing.T) {
 		},
 		{
 			name: "equal higher word but lesser lower word",
-			ip: IP{
+			ip: &IP{
 				lower:  123,
 				higher: 100,
 			},
-			other: IP{
+			other: &IP{
 				lower:  456,
 				higher: 100,
 			},
@@ -404,6 +404,13 @@ func TestIPFromBytes(t *testing.T) {
 				t.Fatalf("Expected test to fail, but did not")
 			}
 
+			if test.wantFail {
+				if err == nil {
+					t.Fatalf("Unexpected success")
+				}
+				return
+			}
+
 			assert.Equal(t, test.expected, ip)
 		})
 	}
@@ -580,5 +587,33 @@ func TestSizeBytes(t *testing.T) {
 
 	for _, test := range tests {
 		assert.Equal(t, test.expected, test.input.SizeBytes(), test.name)
+	}
+}
+
+func TestNext(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *IP
+		expected *IP
+	}{
+		{
+			name:     "Test #1",
+			input:    IPv4FromOctets(10, 0, 0, 1).Dedup(),
+			expected: IPv4FromOctets(10, 0, 0, 2).Dedup(),
+		},
+		{
+			name:     "Test #2",
+			input:    IPv6FromBlocks(10, 20, 30, 40, 50, 60, 70, 80).Dedup(),
+			expected: IPv6FromBlocks(10, 20, 30, 40, 50, 60, 70, 81).Dedup(),
+		},
+		{
+			name:     "Test #3",
+			input:    IPv6FromBlocks(10, 20, 30, 40, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF).Dedup(),
+			expected: IPv6FromBlocks(10, 20, 30, 41, 0, 0, 0, 0).Dedup(),
+		},
+	}
+
+	for _, test := range tests {
+		assert.Equal(t, test.expected, test.input.Next(), test.name)
 	}
 }

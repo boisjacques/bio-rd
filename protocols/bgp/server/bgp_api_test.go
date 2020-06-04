@@ -60,8 +60,8 @@ func TestDumpRIBInOut(t *testing.T) {
 								fsms: []*FSM{
 									0: {
 										ipv4Unicast: &fsmAddressFamily{
-											adjRIBIn:  adjRIBIn.New(filter.NewAcceptAllFilter(), nil, 0, 0, true),
-											adjRIBOut: adjRIBOut.New(&routingtable.Neighbor{Type: route.BGPPathType}, filter.NewAcceptAllFilter(), true),
+											adjRIBIn:  adjRIBIn.New(filter.NewAcceptAllFilterChain(), nil, 0, 0, true),
+											adjRIBOut: adjRIBOut.New(nil, &routingtable.Neighbor{Type: route.BGPPathType}, filter.NewAcceptAllFilterChain(), true),
 										},
 									},
 								},
@@ -86,11 +86,12 @@ func TestDumpRIBInOut(t *testing.T) {
 					peers: &peerManager{
 						peers: map[bnet.IP]*peer{
 							bnet.IPv4FromOctets(10, 0, 0, 0): {
+								addr: bnet.IPv4(123).Ptr(),
 								fsms: []*FSM{
 									0: {
 										ipv4Unicast: &fsmAddressFamily{
-											adjRIBIn:  adjRIBIn.New(filter.NewAcceptAllFilter(), nil, 0, 0, true),
-											adjRIBOut: adjRIBOut.New(&routingtable.Neighbor{Type: route.BGPPathType, RouteServerClient: true}, filter.NewAcceptAllFilter(), false),
+											adjRIBIn:  adjRIBIn.New(filter.NewAcceptAllFilterChain(), nil, 0, 0, true),
+											adjRIBOut: adjRIBOut.New(nil, &routingtable.Neighbor{Type: route.BGPPathType, RouteServerClient: true, Address: bnet.IPv4(0).Ptr()}, filter.NewAcceptAllFilterChain(), false),
 										},
 									},
 								},
@@ -100,12 +101,14 @@ func TestDumpRIBInOut(t *testing.T) {
 				},
 			},
 			addRoutes: []*route.Route{
-				route.NewRoute(bnet.NewPfx(bnet.IPv4FromOctets(20, 0, 0, 0), 16), &route.Path{
+				route.NewRoute(bnet.NewPfx(bnet.IPv4FromOctets(20, 0, 0, 0), 16).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						OriginatorID: 1,
-						NextHop:      bnet.IPv4FromOctets(100, 100, 100, 100),
-						Source:       bnet.IPv4FromOctets(100, 100, 100, 100),
+						BGPPathA: &route.BGPPathA{
+							OriginatorID: 1,
+							NextHop:      bnet.IPv4FromOctets(100, 100, 100, 100).Ptr(),
+							Source:       bnet.IPv4FromOctets(100, 100, 100, 100).Ptr(),
+						},
 					},
 				}),
 			},
@@ -120,11 +123,11 @@ func TestDumpRIBInOut(t *testing.T) {
 					Paths: []*routeapi.Path{
 						{
 							Type: routeapi.Path_BGP,
-							BGPPath: &routeapi.BGPPath{
+							BgpPath: &routeapi.BGPPath{
 								OriginatorId:      1,
 								NextHop:           bnet.IPv4FromOctets(100, 100, 100, 100).ToProto(),
 								Source:            bnet.IPv4FromOctets(100, 100, 100, 100).ToProto(),
-								ASPath:            nil,
+								AsPath:            nil,
 								Communities:       nil,
 								LargeCommunities:  nil,
 								UnknownAttributes: nil,
@@ -143,11 +146,12 @@ func TestDumpRIBInOut(t *testing.T) {
 					peers: &peerManager{
 						peers: map[bnet.IP]*peer{
 							bnet.IPv4FromOctets(10, 0, 0, 0): {
+								addr: bnet.IPv4(123).Ptr(),
 								fsms: []*FSM{
 									0: {
 										ipv4Unicast: &fsmAddressFamily{
-											adjRIBIn:  adjRIBIn.New(filter.NewAcceptAllFilter(), routingtable.NewContributingASNs(), 0, 0, true),
-											adjRIBOut: adjRIBOut.New(&routingtable.Neighbor{Type: route.BGPPathType, RouteServerClient: true}, filter.NewAcceptAllFilter(), false),
+											adjRIBIn:  adjRIBIn.New(filter.NewAcceptAllFilterChain(), routingtable.NewContributingASNs(), 0, 0, true),
+											adjRIBOut: adjRIBOut.New(nil, &routingtable.Neighbor{Type: route.BGPPathType, RouteServerClient: true, Address: bnet.IPv4(123).Ptr()}, filter.NewAcceptAllFilterChain(), false),
 										},
 									},
 								},
@@ -157,28 +161,30 @@ func TestDumpRIBInOut(t *testing.T) {
 				},
 			},
 			addRoutes: []*route.Route{
-				route.NewRoute(bnet.NewPfx(bnet.IPv4FromOctets(20, 0, 0, 0), 16), &route.Path{
+				route.NewRoute(bnet.NewPfx(bnet.IPv4FromOctets(20, 0, 0, 0), 16).Ptr(), &route.Path{
 					Type: route.BGPPathType,
 					BGPPath: &route.BGPPath{
-						OriginatorID: 1,
-						NextHop:      bnet.IPv4FromOctets(100, 100, 100, 100),
-						Source:       bnet.IPv4FromOctets(100, 100, 100, 100),
-						ASPath: types.ASPath{
+						BGPPathA: &route.BGPPathA{
+							OriginatorID: 1,
+							NextHop:      bnet.IPv4FromOctets(100, 100, 100, 100).Ptr(),
+							Source:       bnet.IPv4FromOctets(100, 100, 100, 100).Ptr(),
+							LocalPref:    1000,
+							MED:          2000,
+						},
+						ASPath: &types.ASPath{
 							types.ASPathSegment{
 								Type: types.ASSequence,
 								ASNs: []uint32{15169, 3320},
 							},
 						},
-						Communities: []uint32{100, 200, 300},
-						LargeCommunities: []types.LargeCommunity{
+						Communities: &types.Communities{100, 200, 300},
+						LargeCommunities: &types.LargeCommunities{
 							{
 								GlobalAdministrator: 1,
 								DataPart1:           2,
 								DataPart2:           3,
 							},
 						},
-						LocalPref: 1000,
-						MED:       2000,
 						UnknownAttributes: []types.UnknownPathAttribute{
 							{
 								Optional:   true,
@@ -188,7 +194,7 @@ func TestDumpRIBInOut(t *testing.T) {
 								Value:      []byte{0xff, 0xff},
 							},
 						},
-						ClusterList: []uint32{},
+						ClusterList: &types.ClusterList{},
 					},
 				}),
 			},
@@ -203,16 +209,16 @@ func TestDumpRIBInOut(t *testing.T) {
 					Paths: []*routeapi.Path{
 						{
 							Type: routeapi.Path_BGP,
-							BGPPath: &routeapi.BGPPath{
+							BgpPath: &routeapi.BGPPath{
 								OriginatorId: 1,
 								LocalPref:    1000,
-								MED:          2000,
+								Med:          2000,
 								NextHop:      bnet.IPv4FromOctets(100, 100, 100, 100).ToProto(),
 								Source:       bnet.IPv4FromOctets(100, 100, 100, 100).ToProto(),
-								ASPath: []*routeapi.ASPathSegment{
+								AsPath: []*routeapi.ASPathSegment{
 									{
-										ASSequence: true,
-										ASNs:       []uint32{15169, 3320},
+										AsSequence: true,
+										Asns:       []uint32{15169, 3320},
 									},
 								},
 								Communities: []uint32{100, 200, 300},
@@ -285,7 +291,16 @@ func TestDumpRIBInOut(t *testing.T) {
 			res = append(res, r)
 		}
 
-		assert.Equal(t, test.expected, res, test.name)
+		expected := make([]string, 0)
+		for _, exp := range test.expected {
+			expected = append(expected, exp.String())
+		}
+
+		results := make([]string, 0)
+		for _, r := range res {
+			results = append(results, r.String())
+		}
+		assert.Equal(t, expected, results, test.name)
 	}
 
 	// Test RIBout
@@ -331,6 +346,15 @@ func TestDumpRIBInOut(t *testing.T) {
 			res = append(res, r)
 		}
 
-		assert.Equal(t, test.expected, res, test.name)
+		expected := make([]string, 0)
+		for _, exp := range test.expected {
+			expected = append(expected, exp.String())
+		}
+
+		results := make([]string, 0)
+		for _, r := range res {
+			results = append(results, r.String())
+		}
+		assert.Equal(t, expected, results, test.name)
 	}
 }

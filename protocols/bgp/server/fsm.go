@@ -8,7 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bio-routing/bio-rd/net/tcp"
 	"github.com/bio-routing/bio-rd/protocols/bgp/packet"
+	"github.com/bio-routing/bio-rd/routingtable/filter"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -22,6 +24,13 @@ const (
 	AutomaticStartWithPassiveTcpEstablishment = 5
 	AutomaticStop                             = 8
 	Cease                                     = 100
+	stateNameIdle                             = "idle"
+	stateNameConnect                          = "connect"
+	stateNameActive                           = "active"
+	stateNameOpenSent                         = "openSent"
+	stateNameOpenConfirm                      = "openConfirm"
+	stateNameEstablished                      = "established"
+	stateNameCease                            = "cease"
 )
 
 type state interface {
@@ -30,6 +39,8 @@ type state interface {
 
 // FSM implements the BGP finite state machine (RFC4271)
 type FSM struct {
+	counters fsmCounters
+
 	isBMP       bool
 	peer        *peer
 	eventCh     chan int
@@ -70,6 +81,8 @@ type FSM struct {
 	reason     string
 	active     bool
 
+	establishedTime time.Time
+
 	connectionCancelFunc context.CancelFunc
 }
 
@@ -100,6 +113,7 @@ func newFSM(peer *peer) *FSM {
 		msgRecvCh:        make(chan []byte),
 		msgRecvFailCh:    make(chan error),
 		stopMsgRecvCh:    make(chan struct{}),
+		counters:         fsmCounters{},
 	}
 
 	if peer.ipv4 != nil {
@@ -111,6 +125,26 @@ func newFSM(peer *peer) *FSM {
 	}
 
 	return f
+}
+
+func (fsm *FSM) replaceImportFilterChain(c filter.Chain) {
+	if fsm.ipv4Unicast != nil {
+		fsm.ipv4Unicast.replaceImportFilterChain(c)
+	}
+
+	if fsm.ipv6Unicast != nil {
+		fsm.ipv6Unicast.replaceImportFilterChain(c)
+	}
+}
+
+func (fsm *FSM) replaceExportFilterChain(c filter.Chain) {
+	if fsm.ipv4Unicast != nil {
+		fsm.ipv4Unicast.replaceExportFilterChain(c)
+	}
+
+	if fsm.ipv6Unicast != nil {
+		fsm.ipv6Unicast.replaceExportFilterChain(c)
+	}
 }
 
 func (fsm *FSM) updateLastUpdateOrKeepalive() {
@@ -162,8 +196,12 @@ func (fsm *FSM) run() {
 			}).Info("FSM: Neighbor state change")
 		}
 
-		if newState == "cease" {
+		if newState == stateNameCease {
 			return
+		}
+
+		if oldState != newState && newState == stateNameEstablished {
+			fsm.establishedTime = time.Now()
 		}
 
 		fsm.stateMu.Lock()
@@ -183,19 +221,19 @@ func (fsm *FSM) cancelRunningGoRoutines() {
 func stateName(s state) string {
 	switch s.(type) {
 	case *idleState:
-		return "idle"
+		return stateNameIdle
 	case *connectState:
-		return "connect"
+		return stateNameConnect
 	case *activeState:
-		return "active"
+		return stateNameActive
 	case *openSentState:
-		return "openSent"
+		return stateNameOpenSent
 	case *openConfirmState:
-		return "openConfirm"
+		return stateNameOpenConfirm
 	case *establishedState:
-		return "established"
+		return stateNameEstablished
 	case *ceaseState:
-		return "cease"
+		return stateNameCease
 	default:
 		panic(fmt.Sprintf("Unknown state: %v", s))
 	}
@@ -205,11 +243,38 @@ func (fsm *FSM) cease() {
 	fsm.eventCh <- Cease
 }
 
+func (fsm *FSM) sockSettings(c net.Conn) error {
+	ttl := fsm.peer.ttl
+	setNoRoute := false
+	if ttl == 0 {
+		if fsm.peer.isEBGP() {
+			ttl = 1
+			setNoRoute = true
+		}
+	}
+
+	if setNoRoute {
+		err := setDontRoute(c)
+		if err != nil {
+			return errors.Wrap(err, "Unable to set DontRoute TCP option")
+		}
+	}
+
+	if ttl != 0 {
+		err := setTTL(c, ttl)
+		if err != nil {
+			return errors.Wrap(err, "Unable to set TTL")
+		}
+	}
+
+	return nil
+}
+
 func (fsm *FSM) tcpConnector(ctx context.Context) {
 	for {
 		select {
 		case <-fsm.initiateCon:
-			c, err := net.DialTCP("tcp", &net.TCPAddr{IP: fsm.local}, &net.TCPAddr{IP: fsm.peer.addr.ToNetIP(), Port: BGPPORT})
+			c, err := tcp.Dial(&net.TCPAddr{IP: fsm.local}, &net.TCPAddr{IP: fsm.peer.addr.ToNetIP(), Port: BGPPORT}, fsm.peer.ttl, fsm.peer.config.AuthenticationKey, fsm.peer.ttl == 0)
 			if err != nil {
 				select {
 				case fsm.conErrCh <- err:
@@ -248,9 +313,21 @@ func (fsm *FSM) msgReceiver() error {
 }
 
 func (fsm *FSM) decodeOptions() *packet.DecodeOptions {
-	return &packet.DecodeOptions{
+	ret := &packet.DecodeOptions{
 		Use32BitASN: fsm.supports4OctetASN,
 	}
+
+	ipv4unicast := fsm.addressFamily(packet.IPv4AFI, packet.UnicastSAFI)
+	if ipv4unicast != nil {
+		ret.AddPathIPv4Unicast = ipv4unicast.addPathRX
+	}
+
+	ipv6unicast := fsm.addressFamily(packet.IPv6AFI, packet.UnicastSAFI)
+	if ipv6unicast != nil {
+		ret.AddPathIPv6Unicast = ipv6unicast.addPathRX
+	}
+
+	return ret
 }
 
 func (fsm *FSM) startConnectRetryTimer() {
@@ -258,9 +335,8 @@ func (fsm *FSM) startConnectRetryTimer() {
 }
 
 func (fsm *FSM) resetConnectRetryTimer() {
-	if !fsm.connectRetryTimer.Reset(fsm.connectRetryTime) {
-		<-fsm.connectRetryTimer.C
-	}
+	stopTimer(fsm.connectRetryTimer)
+	fsm.connectRetryTimer.Reset(fsm.connectRetryTime)
 }
 
 func (fsm *FSM) resetConnectRetryCounter() {

@@ -25,7 +25,7 @@ func TestAppendPath(t *testing.T) {
 			name:  "append 0",
 			times: 0,
 			bgpPath: &route.BGPPath{
-				ASPath: types.ASPath{
+				ASPath: &types.ASPath{
 					types.ASPathSegment{
 						Type: types.ASSequence,
 						ASNs: []uint32{12345, 12345},
@@ -40,7 +40,7 @@ func TestAppendPath(t *testing.T) {
 			name:  "append 3",
 			times: 3,
 			bgpPath: &route.BGPPath{
-				ASPath: types.ASPath{
+				ASPath: &types.ASPath{
 					types.ASPathSegment{
 						Type: types.ASSequence,
 						ASNs: []uint32{12345, 15169},
@@ -56,7 +56,7 @@ func TestAppendPath(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			a := NewASPathPrependAction(12345, test.times)
-			res := a.Do(bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8), &route.Path{
+			res := a.Do(bnet.NewPfx(bnet.IPv4FromOctets(10, 0, 0, 0), 8).Ptr(), &route.Path{
 				BGPPath: test.bgpPath,
 			})
 

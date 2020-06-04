@@ -14,7 +14,7 @@ import (
 type MultiProtocolReachNLRI struct {
 	AFI     uint16
 	SAFI    uint8
-	NextHop bnet.IP
+	NextHop *bnet.IP
 	NLRI    *NLRI
 }
 
@@ -37,7 +37,7 @@ func (n *MultiProtocolReachNLRI) serialize(buf *bytes.Buffer, opt *EncodeOptions
 	return uint16(tempBuf.Len())
 }
 
-func deserializeMultiProtocolReachNLRI(b []byte, addPath bool) (MultiProtocolReachNLRI, error) {
+func deserializeMultiProtocolReachNLRI(b []byte, opt *DecodeOptions) (MultiProtocolReachNLRI, error) {
 	n := MultiProtocolReachNLRI{}
 	nextHopLength := uint8(0)
 
@@ -64,10 +64,16 @@ func deserializeMultiProtocolReachNLRI(b []byte, addPath bool) (MultiProtocolRea
 			fmt.Errorf("Failed to decode next hop IP: expected %d bytes for NLRI, only %d remaining", nextHopLength, budget)
 	}
 
-	n.NextHop, err = bnet.IPFromBytes(variable[:nextHopLength])
+	firstNextHopLength := nextHopLength
+	if nextHopLength == 32 {
+		// second next-hop is lladdr (see rfc2545 sec 3 par 2)
+		firstNextHopLength = 16
+	}
+	nh, err := bnet.IPFromBytes(variable[:firstNextHopLength])
 	if err != nil {
 		return MultiProtocolReachNLRI{}, errors.Wrap(err, "Failed to decode next hop IP")
 	}
+	n.NextHop = nh.Dedup()
 	budget -= int(nextHopLength)
 
 	if budget == 0 {
@@ -77,7 +83,7 @@ func deserializeMultiProtocolReachNLRI(b []byte, addPath bool) (MultiProtocolRea
 	variable = variable[1+nextHopLength:] // 1 <- RESERVED field
 
 	buf := bytes.NewBuffer(variable)
-	nlri, err := decodeNLRIs(buf, uint16(buf.Len()), n.AFI, addPath)
+	nlri, err := decodeNLRIs(buf, uint16(buf.Len()), n.AFI, opt.addPath(int(n.AFI), int(n.SAFI)))
 	if err != nil {
 		return MultiProtocolReachNLRI{}, err
 	}
